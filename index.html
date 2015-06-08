@@ -166,19 +166,7 @@ function Calculator($rootScope)
     
     this.scope.inputs.svgScaleX = 1.0;
     this.scope.$watch("inputs.svgScaleX", function(){ me.calcSvgModel(); });
-    
-    /*this.g = 9.81;
-    this.scope.velocity = 74;
-    this.scope.velocityFPS = 0;
-    this.scope.velocityKMH = 0;
-    
-    
-    this.scope.$watch("velocity", function(){ 
-        me.scope.velocityFPS = me.scope.velocity / 0.3048;
-        me.scope.velocityKMH = me.scope.velocity * 3.6;
-        });
-    */
-    
+        
     this.scope.calculator = this;
 }
 
@@ -260,13 +248,16 @@ Calculator.prototype.calcModel = function()
     for(var j=0; j<this.scope.inputs.settings.length; j++) // do not discard user data
         if(this.scope.inputs.settings[j].distance > max)
             max = this.scope.inputs.settings[j].distance;
-        
-    var i=0;
-    for(var d = 4; d < max; d++)                  
+                    
+    var i=0, step=1;
+    for(var d = 4; d < max; d+=step) // d is the distance to the target           
     {
-        if(d>=11) // step of 2
-            d++;
+        if(d>11) // above 11m switch to 2
+            step = 2;
             
+        if(d>=this.expandedModelDistance && d<this.expandedModelDistance+2)
+            step = 0.25;
+        
         if(typeof(this.scope.inputs.maxDistance) == "number" && d > max)
             break;
             
@@ -350,55 +341,10 @@ Calculator.prototype.calcSlope = function()
         cd = Math.cos(40*d2r) * d; this.scope.model[i].down40 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
         cd = Math.cos(50*d2r) * d; this.scope.model[i].down50 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
         
-        /*cd = Math.cos(10*d2r) * d; this.scope.model[i].up10 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
-        cd = Math.cos(20*d2r) * d; this.scope.model[i].up20 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
-        cd = Math.cos(30*d2r) * d; this.scope.model[i].up30 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
-        cd = Math.cos(40*d2r) * d; this.scope.model[i].up40 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
-        cd = Math.cos(50*d2r) * d; this.scope.model[i].up50 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
-        */
         var time = d/this.scope.inputs.v0;
         var drop = 9.81/2.0*time*time;
         this.scope.model[i].time = time.toFixed(2);
         this.scope.model[i].drop = drop.toFixed(1); // excludes drag / air resistance
-    }
-};
-
-Calculator.prototype.calcSlopeFaustformel = function()
-{
-    /*
-    Faustformel:
-    Neigungen bis 5° werden bei der Entfernungsbestimmung ignoriert, da diese nicht ins Gewicht fallen.
-    Bei größeren Neigungen werden aus gleichem Grund immer 5° abgezogen, da diese nicht berücksichtigt werden sollen.
-    Bei Bergschüssen sollten pro 5° Neigung ca. 1,25% von der ermittelten Entfernung abgezogen werden. 
-    Bei Talschüssen sollten pro 5° Neigung ca. 2,5 % von der ermittelten Entfernung abgezogen werden.
-    */
-    // calc slope
-    for(var i = 0; i < this.scope.model.length; i++)
-    {
-        var d = this.scope.model[i].distance;
-        var cd;
-        cd = d - 1*0.025 * d; this.scope.model[i].down10 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
-        cd = d - 3*0.025 * d; this.scope.model[i].down20 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
-        cd = d - 5*0.025 * d; this.scope.model[i].down30 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
-        cd = d - 7*0.025 * d; this.scope.model[i].down40 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
-        cd = d - 9*0.025 * d; this.scope.model[i].down50 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
-        
-        cd = d - 1*0.0125 * d; this.scope.model[i].up10 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
-        cd = d - 3*0.0125 * d; this.scope.model[i].up20 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
-        cd = d - 5*0.0125 * d; this.scope.model[i].up30 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
-        cd = d - 7*0.0125 * d; this.scope.model[i].up40 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
-        cd = d - 9*0.0125 * d; this.scope.model[i].up50 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
-        
-        var time = d/this.scope.inputs.v0;
-        var drop = 9.81/2.0*time*time;
-        this.scope.model[i].time = time.toFixed(2);
-        this.scope.model[i].drop = drop.toFixed(1); // excludes drag / air resistance
-        
-        /*var time2 = (d+1)/this.scope.inputs.v0;
-        var drop2 = 9.81/2.0*time2*time2;
-        var dd = (drop2-drop);     // cm drop per 1m further as estimate for vertical offset
-        var dReading =  this.scope.model[i].delta1m/dd*0.1;
-        this.scope.model[i].deltaH = (dd*100).toFixed(2); // delta pro 0.1 adjust*/
     }
 };
 
@@ -580,8 +526,8 @@ Calculator.prototype.saveSvg = function()
       <table id="table">
       <tr>
         <th colspan=2><input type="text" ng-model="inputs.settingsName" style="width:112px"></th>
-        <th> &delta;/m </th>
         <th> m </th>
+        <th> &delta;/m </th>
         <th>10&deg;</th>
         <th>20&deg;</th>
         <th>30&deg;</th>
@@ -594,8 +540,8 @@ Calculator.prototype.saveSvg = function()
       <tr ng-repeat="i in model" ng-class="{paralax: i.distance<9, tenmeters: i.distance % 10 == 0}" >
         <td><input type="number" ng-model="i.reading"  style="width:45px"></td>
         <td>{{ i.distance<9 && (i.reading || "-") || i.interpolated }} </td>
+        <td><button style="width:100%" ng-click="calculator.expandedModelDistance=i.distance; calculator.calcModel()">{{i.distance}}m</button></td>
         <td>{{ i.distance<9 && "-" || i.delta1m }} </td>
-        <td>{{i.distance}}m</td>
         <td style="background-color:#F5FAFF">{{i.down10}}</td>
         <td style="background-color:#E0F0FF">{{i.down20}}</td>
         <td style="background-color:#B8DBFF">{{i.down30}}</td>
