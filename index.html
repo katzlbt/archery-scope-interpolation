@@ -1,0 +1,654 @@
+<html manifest="cache.manifest" ng-app="myApp">
+<head>
+    <title>Archery Scope Interpolation</title>
+    <meta name="viewport" content="width=640" />
+    <script src="svg.min.js"> </script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.16/angular.min.js"></script>
+    <style type="">
+    .tdslope { width:250px }
+    table { font-family:monospace; border-width:1px; border-collapse: collapse; border-style: solid; }
+    td, th { min-width:50px; border-width:1px; border-style: solid; text-align:center; }
+    .paralax { background-color: #CCC; }
+    .paralax-wrong { text-decoration: line-through; }
+    .tenmeters { font-weight: bold }
+    </style>
+<script>
+
+    var app = angular.module('myApp', []);
+    app.config(['$controllerProvider', function($controllerProvider) {
+      // this option might be handy for migrating old apps, but please don't use it in new ones!
+      $controllerProvider.allowGlobals();
+    }]);
+
+    // http://blog.ivank.net/interpolation-with-cubic-splines.html
+	function CSPL()
+	{
+	    this.xs = [];
+	    this.ys = [];
+	    this.ks = [];
+	}
+	
+	CSPL._gaussJ = {};
+	CSPL._gaussJ.solve = function(A, x)	// in Matrix, out solutions
+	{
+		var m = A.length;
+		for(var k=0; k<m; k++)	// column
+		{
+			// pivot for column
+			var i_max = 0; var vali = Number.NEGATIVE_INFINITY;
+			for(var i=k; i<m; i++) if(A[i][k]>vali) { i_max = i; vali = A[i][k];}
+			CSPL._gaussJ.swapRows(A, k, i_max);
+			
+			if(A[i_max][i] == 0) console.log("matrix is singular!");
+			
+			// for all rows below pivot
+			for(var i=k+1; i<m; i++)
+			{
+				for(var j=k+1; j<m+1; j++)
+					A[i][j] = A[i][j] - A[k][j] * (A[i][k] / A[k][k]);
+				A[i][k] = 0;
+			}
+		}
+		
+		for(var i=m-1; i>=0; i--)	// rows = columns
+		{
+			var v = A[i][m] / A[i][i];
+			x[i] = v;
+			for(var j=i-1; j>=0; j--)	// rows
+			{
+				A[j][m] -= A[j][i] * v;
+				A[j][i] = 0;
+			}
+		}
+	}
+	
+	CSPL._gaussJ.zerosMat = function(r,c) {var A = []; for(var i=0; i<r; i++) {A.push([]); for(var j=0; j<c; j++) A[i].push(0);} return A;}
+	CSPL._gaussJ.printMat = function(A){ for(var i=0; i<A.length; i++) console.log(A[i]); }
+	CSPL._gaussJ.swapRows = function(m, k, l) {var p = m[k]; m[k] = m[l]; m[l] = p;}
+		
+	CSPL.prototype.getNaturalKs = function(xs, ys)	// in x values, in y values, out k values
+	{
+	    this.xs = xs;
+	    this.ys = ys;
+	    CSPL._getNaturalKs(xs, ys, this.ks);
+	};
+	
+	CSPL._getNaturalKs = function(xs, ys, ks)	// in x values, in y values, out k values
+	{
+		var n = xs.length-1;
+		var A = CSPL._gaussJ.zerosMat(n+1, n+2);
+			
+		for(var i=1; i<n; i++)	// rows
+		{
+			A[i][i-1] = 1/(xs[i] - xs[i-1]);
+			
+			A[i][i  ] = 2 * (1/(xs[i] - xs[i-1]) + 1/(xs[i+1] - xs[i])) ;
+			
+			A[i][i+1] = 1/(xs[i+1] - xs[i]);
+			
+			A[i][n+1] = 3*( (ys[i]-ys[i-1])/((xs[i] - xs[i-1])*(xs[i] - xs[i-1]))  +  (ys[i+1]-ys[i])/ ((xs[i+1] - xs[i])*(xs[i+1] - xs[i])) );
+		}
+		
+		A[0][0  ] = 2/(xs[1] - xs[0]);
+		A[0][1  ] = 1/(xs[1] - xs[0]);
+		A[0][n+1] = 3 * (ys[1] - ys[0]) / ((xs[1]-xs[0])*(xs[1]-xs[0]));
+		
+		A[n][n-1] = 1/(xs[n] - xs[n-1]);
+		A[n][n  ] = 2/(xs[n] - xs[n-1]);
+		A[n][n+1] = 3 * (ys[n] - ys[n-1]) / ((xs[n]-xs[n-1])*(xs[n]-xs[n-1]));
+			
+		CSPL._gaussJ.solve(A, ks);		
+	};
+		
+	CSPL.prototype.evalSpline = function(x)
+	{
+	    return CSPL._evalSpline(x, this.xs, this.ys, this.ks);
+	};
+	
+	CSPL._evalSpline = function(x, xs, ys, ks)
+	{
+		var i = 1;
+		while(xs[i]<x) // breaks beyond array undefined < any
+		    i++;
+		
+		// extrapolate far
+		if(i == xs.length)
+		    i--;
+		    
+		var t = (x - xs[i-1]) / (xs[i] - xs[i-1]);
+		
+		var a =  ks[i-1]*(xs[i]-xs[i-1]) - (ys[i]-ys[i-1]);
+		var b = -ks[i  ]*(xs[i]-xs[i-1]) + (ys[i]-ys[i-1]);
+		
+		var q = (1-t)*ys[i-1] + t*ys[i] + t*(1-t)*(a*(1-t)+b*t);
+		return q;
+	};
+
+function Calculator($rootScope)
+{
+    this.scope = $rootScope;
+    DEBUG_SCOPE = $rootScope;
+    
+    this.scope.inputs = { 
+        arrow:{ weight:74, count:6, weightAll:156 },
+        settings:[] // { distance:, reading: }
+        };
+    
+    this.scope.savedSettings = {};
+    
+    var me = this;
+    
+    this.scope.$watch("inputs.arrow.weightAll", function(){ me.scope.inputs.arrow.grams = me.scope.inputs.arrow.weightAll/me.scope.inputs.arrow.count; });
+    this.scope.$watch("inputs.arrow.count", function(){ me.scope.inputs.arrow.grams = me.scope.inputs.arrow.weightAll/me.scope.inputs.arrow.count; });
+    this.scope.$watch("inputs.arrow.grams", function(){ me.scope.inputs.arrow.grains = me.scope.inputs.arrow.grams * 15.432358; });
+    
+    this.maxTable = 90;
+    this.scope.inputs.maxDistance = 60;
+    me.scope.inputs.v0 = 74;
+    
+    this.parallax = 9; // meters
+    
+    this.scope.$watch("inputs.maxDistance", function(){ me.calcModel(); }, true);
+    this.scope.$watch("model", function(){ me.calcTable(); }, true);
+    
+    this.load();
+    
+    this.scope.$watch("inputsJSON", function(){ me.scope.inputsURI = encodeURIComponent(me.scope.inputsJSON); }, true);
+    
+    this.scope.$watch("inputs.v0fps", function(){ me.scope.inputs.v0 = me.scope.inputs.v0fps * 0.3048; me.calcTable(); });
+    
+    this.scope.clearLocalStorage = function() { localStorage.removeItem('scopeinputs');  me.clearInputs(); };
+    this.scope.saveSettings = function() { me.saveSettings(); };
+    this.scope.loadSettings = function(x) { me.loadSettings(x); };
+    this.scope.deleteSettings = function(x) { if(confirm('Delete?')) { me.deleteSettings(x); } };
+    
+    this.scope.$watch("inputs.arrow.name", function(){  document.title = me.scope.inputs.arrow.name; });
+    
+    this.scope.inputs.svgScaleX = 1.0;
+    this.scope.$watch("inputs.svgScaleX", function(){ me.calcSvgModel(); });
+    
+    /*this.g = 9.81;
+    this.scope.velocity = 74;
+    this.scope.velocityFPS = 0;
+    this.scope.velocityKMH = 0;
+    
+    
+    this.scope.$watch("velocity", function(){ 
+        me.scope.velocityFPS = me.scope.velocity / 0.3048;
+        me.scope.velocityKMH = me.scope.velocity * 3.6;
+        });
+    */
+    
+    this.scope.calculator = this;
+}
+
+function getParameterByName(name) {
+    name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+    var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+        results = regex.exec(location.search);
+    return results == null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+}
+
+Calculator.prototype.clearInputs = function()
+{
+    this.scope.inputs.maxDistance = 60;
+    this.scope.inputs.settings = [];
+};
+
+Calculator.prototype.load = function()
+{
+    var ls = localStorage.getItem('savedSettings');
+    if(ls)
+        this.scope.savedSettings = angular.fromJson(ls);
+
+    var data = getParameterByName("data");
+    if(data && confirm("Replace saved data from URL?") === true)
+    {
+        data = decodeURIComponent(data);
+        this.scope.inputs = angular.fromJson(data);
+        return true;
+    }
+
+    var inp = localStorage.getItem('scopeinputs');
+    if(!inp || inp==="undefined")
+        return false;
+        
+    this.scope.inputsJSON = inp;
+    this.scope.inputs = angular.fromJson(inp);
+    
+    return true;
+};
+
+Calculator.prototype.save = function()
+{
+    this.scope.inputsJSON = angular.toJson(this.scope.inputs);
+    localStorage.setItem('scopeinputs', this.scope.inputsJSON);
+    var json = angular.toJson(this.scope.savedSettings);
+    localStorage.setItem('savedSettings', json);
+};
+
+Calculator.prototype.saveSettings = function()
+{
+    if(!this.scope.inputs.settingsName) // undefined or empty
+    {
+        alert("Name of scope readings is empty! Cannot save.");
+        return;
+    }
+    
+    this.scope.savedSettings[this.scope.inputs.settingsName] = this.scope.inputs.settings;
+    this.save();
+};
+
+Calculator.prototype.loadSettings = function(name)
+{
+    this.scope.inputs.settings = this.scope.savedSettings[name];
+    this.scope.inputs.settingsName = name;
+    this.calcModel();
+};
+
+Calculator.prototype.deleteSettings = function(name)
+{
+    delete this.scope.savedSettings[name];
+    this.save();
+};
+
+Calculator.prototype.calcModel = function()
+{
+    this.scope.model = [];
+    
+    var max = this.scope.inputs.maxDistance;
+    for(var j=0; j<this.scope.inputs.settings.length; j++) // do not discard user data
+        if(this.scope.inputs.settings[j].distance > max)
+            max = this.scope.inputs.settings[j].distance;
+        
+    var i=0;
+    for(var d = 4; d < max; d++)                  
+    {
+        if(d>=11) // step of 2
+            d++;
+            
+        if(typeof(this.scope.inputs.maxDistance) == "number" && d > max)
+            break;
+            
+        this.scope.model[i] = {};
+        
+        this.scope.model[i].distance = d;
+        this.scope.model[i].reading = 0;
+        
+        for(var j=0; j<this.scope.inputs.settings.length; j++)
+            if(this.scope.inputs.settings[j].distance == d)
+                this.scope.model[i].reading = this.scope.inputs.settings[j].reading; 
+                
+        i++;
+    }                        
+};
+
+Calculator.prototype.calcTable = function()
+{
+    // this.g
+    // this.velocity
+    // this.distance[this.maxTable]
+    // y0 = 0 the initial height of the projectile
+    // ? = this.theta[]
+        
+    var n = 0, xn = 0;
+    
+    this.scope.inputs.settings = []; // clear saved data
+    
+    var xs=[], ys=[];
+    for(var i = 0; i < this.scope.model.length; i++)
+    {
+        if(this.scope.model[i].reading > 0)
+        {
+            this.scope.inputs.settings[n] = {};
+            this.scope.inputs.settings[n].distance = this.scope.model[i].distance;
+            this.scope.inputs.settings[n].reading = this.scope.model[i].reading;
+            n++;
+            
+            if(this.scope.model[i].distance < this.parallax) // must avoid paralax error!!
+                continue;
+            
+            xs[xn] = this.scope.model[i].distance;
+            ys[xn] = this.scope.model[i].reading;
+            xn++;
+        }
+    }
+    
+    this.save();
+    
+    if(n < 3)
+        return;
+    
+    this.cubicSpline = new CSPL();
+    this.cubicSpline.getNaturalKs(xs, ys);
+
+    for(var i = 0; i < this.scope.model.length; i++)
+    {
+        if(this.scope.model[i].distance < this.parallax) // must avoid paralax error!!
+            continue;
+            
+        var y = this.cubicSpline.evalSpline(this.scope.model[i].distance);
+        this.scope.model[i].interpolated = y.toFixed(2);
+        var y2 = this.cubicSpline.evalSpline(this.scope.model[i].distance+1);
+        this.scope.model[i].delta1m = (y2-y).toFixed(2);
+    }
+    
+    this.calcSlope();
+};
+
+Calculator.prototype.calcSlope = function()
+{
+    var d2r = Math.PI/180; // deg to rad
+    
+    for(var i = 0; i < this.scope.model.length; i++)
+    {
+        var d = this.scope.model[i].distance;
+        var cd;
+        cd = Math.cos(10*d2r) * d; this.scope.model[i].down10 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        cd = Math.cos(20*d2r) * d; this.scope.model[i].down20 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        cd = Math.cos(30*d2r) * d; this.scope.model[i].down30 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        cd = Math.cos(40*d2r) * d; this.scope.model[i].down40 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        cd = Math.cos(50*d2r) * d; this.scope.model[i].down50 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        
+        /*cd = Math.cos(10*d2r) * d; this.scope.model[i].up10 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        cd = Math.cos(20*d2r) * d; this.scope.model[i].up20 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        cd = Math.cos(30*d2r) * d; this.scope.model[i].up30 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        cd = Math.cos(40*d2r) * d; this.scope.model[i].up40 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        cd = Math.cos(50*d2r) * d; this.scope.model[i].up50 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        */
+        var time = d/this.scope.inputs.v0;
+        var drop = 9.81/2.0*time*time;
+        this.scope.model[i].time = time.toFixed(2);
+        this.scope.model[i].drop = drop.toFixed(1); // excludes drag / air resistance
+    }
+};
+
+Calculator.prototype.calcSlopeFaustformel = function()
+{
+    /*
+    Faustformel:
+    Neigungen bis 5° werden bei der Entfernungsbestimmung ignoriert, da diese nicht ins Gewicht fallen.
+    Bei größeren Neigungen werden aus gleichem Grund immer 5° abgezogen, da diese nicht berücksichtigt werden sollen.
+    Bei Bergschüssen sollten pro 5° Neigung ca. 1,25% von der ermittelten Entfernung abgezogen werden. 
+    Bei Talschüssen sollten pro 5° Neigung ca. 2,5 % von der ermittelten Entfernung abgezogen werden.
+    */
+    // calc slope
+    for(var i = 0; i < this.scope.model.length; i++)
+    {
+        var d = this.scope.model[i].distance;
+        var cd;
+        cd = d - 1*0.025 * d; this.scope.model[i].down10 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        cd = d - 3*0.025 * d; this.scope.model[i].down20 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        cd = d - 5*0.025 * d; this.scope.model[i].down30 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        cd = d - 7*0.025 * d; this.scope.model[i].down40 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        cd = d - 9*0.025 * d; this.scope.model[i].down50 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        
+        cd = d - 1*0.0125 * d; this.scope.model[i].up10 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        cd = d - 3*0.0125 * d; this.scope.model[i].up20 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        cd = d - 5*0.0125 * d; this.scope.model[i].up30 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        cd = d - 7*0.0125 * d; this.scope.model[i].up40 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        cd = d - 9*0.0125 * d; this.scope.model[i].up50 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
+        
+        var time = d/this.scope.inputs.v0;
+        var drop = 9.81/2.0*time*time;
+        this.scope.model[i].time = time.toFixed(2);
+        this.scope.model[i].drop = drop.toFixed(1); // excludes drag / air resistance
+        
+        /*var time2 = (d+1)/this.scope.inputs.v0;
+        var drop2 = 9.81/2.0*time2*time2;
+        var dd = (drop2-drop);     // cm drop per 1m further as estimate for vertical offset
+        var dReading =  this.scope.model[i].delta1m/dd*0.1;
+        this.scope.model[i].deltaH = (dd*100).toFixed(2); // delta pro 0.1 adjust*/
+    }
+};
+
+Calculator.prototype.calcSvgModel = function()
+{
+    this.svgModel = [];
+    
+    var spline = this.cubicSpline;
+    var calcOneAngle = function(a, model)
+    {
+        var minReading = 999;
+        for(var d=70; d>=10; d-=2) // paralax error prohibits plotting 5m values
+        {
+            var p = { distance:d , reading:0, angle:a };
+            var realD = p.distance * Math.cos(a * d2r);
+            p.reading = spline.evalSpline(realD);
+            
+            minReading = Math.min(minReading, p.reading);
+            console.log(a, p.reading, minReading);
+            if(p.reading <= minReading) // avoid plotting parallax area
+                model.push(p);
+        }
+        
+        return minReading;
+    };
+    
+    var d2r = Math.PI/180; // deg to rad
+
+    // for every range and angle calc a data point
+    calcOneAngle(0, this.svgModel);
+    //calcOneAngle(0, this.svgModel);
+    calcOneAngle(10, this.svgModel);
+    calcOneAngle(15, this.svgModel);
+    calcOneAngle(20, this.svgModel);
+    calcOneAngle(25, this.svgModel);
+    calcOneAngle(30, this.svgModel);
+    calcOneAngle(40, this.svgModel);
+    calcOneAngle(50, this.svgModel);
+    
+    if(!this.svg)
+        this.svg = SVG('scale').attr({ width:"94mm", height:"200mm", preserveAspectRatio:"none" }).viewbox(0,0,89,200)
+    else
+        this.svg.clear();
+    
+    var group = this.svg.group().transform({scaleX: this.scope.inputs.svgScaleX });
+        
+    for(var i in this.svgModel)
+    {
+        var m = this.svgModel[i];
+        //console.log(m.reading, m.angle);
+        var w = 0.1;
+        var h = 0.9;
+        var y0 = 0;
+        
+        if(m.angle == 0) // make y-space for numbers
+            y0 = 0.1;
+            
+        if(m.distance % 10 == 0)
+        {
+            w=0.4;
+            
+            if(m.angle == 0)
+                group.text(""+m.distance).size(1.2).move(m.reading - w/2.0 -0.50, y0 + 8.275); // soewhat off in Safari, works in Chrome
+        }
+        else if(m.distance % 2 == 0)
+            h=0.5;
+    
+        group.rect(w, h).move(m.reading - w/2.0, y0 + 10-(m.angle)/5);        
+    }
+        
+    group.rect(0.1, 11).move(6, 0);
+    group.rect(0.1, 11).move(88, 0);
+    
+    group.text(this.scope.inputs.settingsName).size(3).move(55, 0);
+    var px = this.getParallaxReadings();
+    if(px)
+    {
+        var z1 = "", z2 = "";
+        for(var i=0;i< px.length; i++)
+            if(i<3)
+                z1 += px[i]+" ";
+            else
+                z2 += px[i]+" ";
+        
+        group.text(z1).size(2.5).move(55, 3.4);
+        group.text(z2).size(2.5).move(55, 6);
+    }
+    
+    var xml= document.getElementById('scale').innerHTML;
+    document.getElementById('svgxml').innerText = xml;
+    //return this.svgModel;
+};
+
+Calculator.prototype.getParallaxReadings = function()
+{
+    var ret = []; // must not be ""
+    
+    for(var i = 0; i < this.scope.model.length; i++)
+    {
+        if(this.scope.model[i].distance >= this.parallax) // normal
+            continue;
+            
+        if(this.scope.model[i].reading > 0)
+            ret.push(this.scope.model[i].distance +"m/"+ this.scope.model[i].reading);
+    }
+   
+    return ret;
+};
+
+Calculator.prototype.saveSvg = function()
+{
+    function errorHandler(e) { alert(e.message); console.log(e); }
+    function onInitFs(fs) {
+    
+      fs.root.getFile('log.txt', {create: true}, function(fileEntry) {
+    
+        // Create a FileWriter object for our FileEntry (log.txt).
+        fileEntry.createWriter(function(fileWriter) {
+    
+          fileWriter.onwriteend = function(e) {
+            console.log('Write completed.');
+          };
+    
+          fileWriter.onerror = function(e) {
+            console.log('Write failed: ' + e.toString());
+          };
+    
+          // Create a new Blob and write it to log.txt.
+          var bb = new BlobBuilder(); // Note: window.WebKitBlobBuilder in Chrome 12.
+          bb.append('Lorem Ipsum');
+          fileWriter.write(bb.getBlob('text/plain'));
+    
+        }, errorHandler);
+    
+      }, errorHandler);
+    
+    }
+
+    window.webkitRequestFileSystem(window.PERSISTENT, 65535, onInitFs, errorHandler);
+};
+
+</script>
+</head>
+<body>
+    <div ng-controller="Calculator">
+      <table id="table">
+      <tr>
+        <th>Arrow Name</th>
+        <th>Arrow Weight (all)</th>
+        <th>Arrow Count</th>
+        <th>Arrow Weight (gram)</th>
+      </tr>
+      <tr>
+        <td><input type="text" ng-model="inputs.settingsName"></td>
+        <td><input type="number" ng-model="inputs.arrow.weightAll"></td>
+        <td><input type="number" ng-model="inputs.arrow.count"></td>
+        <td><input type="number" ng-model="inputs.arrow.grams"></td>
+      </tr>
+      <tr>
+        <td>grains</td>
+        <td>{{ (inputs.arrow.grains * inputs.arrow.count).toFixed(2) }}</td>
+        <td></td>
+        <td>{{ inputs.arrow.grains.toFixed(2) }}</td>
+      </tr>
+      <tr>
+        <th>Max Distance</th>
+        <th>Velocity v0 (fps)</th>
+        <th>Velocity v0 (m/s)</th>
+      </tr>
+      <tr>
+        <td><input type="number" ng-model="inputs.maxDistance"></td>
+        <td><input type="number" ng-model="inputs.v0fps"></td>
+        <td><input type="number" ng-model="inputs.v0"></td>
+      </tr>
+      </table>
+      
+      <br/>
+
+      <table id="table">
+      <tr>
+        <th colspan=2><input type="text" ng-model="inputs.settingsName" style="width:112px"></th>
+        <th> &delta;/m </th>
+        <th> m </th>
+        <th>10&deg;</th>
+        <th>20&deg;</th>
+        <th>30&deg;</th>
+        <th> m </th>
+        <th>40&deg;</th>
+        <th>50&deg;</th>
+        <th>time</th>
+        <th>drop</th>
+      </tr> 
+      <tr ng-repeat="i in model" ng-class="{paralax: i.distance<9, tenmeters: i.distance % 10 == 0}" >
+        <td><input type="number" ng-model="i.reading"  style="width:45px"></td>
+        <td>{{ i.distance<9 && (i.reading || "-") || i.interpolated }} </td>
+        <td>{{ i.distance<9 && "-" || i.delta1m }} </td>
+        <td>{{i.distance}}m</td>
+        <td style="background-color:#F5FAFF">{{i.down10}}</td>
+        <td style="background-color:#E0F0FF">{{i.down20}}</td>
+        <td style="background-color:#B8DBFF">{{i.down30}}</td>
+        <td>{{i.distance}}m</td>
+        <td style="background-color:#A3D1FF">{{i.down40}}</td>
+        <td style="background-color:#DDDDFF">{{i.down50}}</td>
+        <td style="background-color:#FFF">{{i.time}}s</td>
+        <td style="background-color:#FFF">{{i.drop}}m</td>
+      </tr>
+      <tr>
+        <th><button ng-click="saveSettings()">save</button></th>
+        <th> interpol </th>
+        <th> &delta;/m </th>
+        <th> m </th>
+        <th>10&deg;</th>
+        <th>20&deg;</th>
+        <th>30&deg;</th>
+        <th> m </th>
+        <th>40&deg;</th>
+        <th>50&deg;</th>
+        <th>time(v0)</th>
+        <th>drop(v0)</th>
+      </tr>
+      </table>
+      <br/>
+      Scope redings saved in local cache of your device ...
+      <table id="readings">
+      <tr>
+        <th>name</th>
+        <th>use</th>
+      </tr>
+      <tr ng-repeat="(key, value) in savedSettings">
+
+        <td> {{ key }} </td>
+        <td><button ng-click="loadSettings(key)">load</button></td>
+        <td ng-repeat="item in savedSettings[key]"> {{ item.distance }}m {{ item.reading }} </td>
+        <td><button ng-click="deleteSettings(key)">delete</button></td>
+      </tr>
+      </table>
+      <br/>
+      <label>Bookmark this arrow:</label>
+      <a href="index.html?data={{ inputsURI }}">VisiCalc {{ inputs.settingsName }}</a>
+      <p>Howto bookmark: (1) open/click the link, (2) create bookmark on phone or desktop, (3) repeat after changes!</p>
+      <p>Enter 3 readings to start. Arrow weight is not used in the interpolation. You can enter yard-readings even if it says meters, just dont mix y and m.</p>
+      <button ng-click="clearLocalStorage()">CLEAR DATA</button>
+    </div>
+      <br>
+      <button ng-click="calculator.calcSvgModel()">PLOT SCALE</button>
+      <input type="number" min="0.8" max="2" step="any" ng-model="inputs.svgScaleX" style="width:40px">
+      <!--button ng-click="calculator.saveSvg();">Save to file</button-->
+      <div id="scale" style="width:100mm; height:11mm; border:1px solid black;">
+      </div>
+    <pre id="svgxml">
+    </pre>
+</body>
+</html>
