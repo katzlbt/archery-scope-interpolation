@@ -10,7 +10,8 @@
     td, th { min-width:50px; border-width:1px; border-style: solid; text-align:center; }
     .paralax { background-color: #CCC; }
     .paralax-wrong { text-decoration: line-through; }
-    .tenmeters { font-weight: bold }
+    .tenmeters { background-color: #FCC; font-weight: bold }
+    .twometers { background-color: #FFC; }
     </style>
 <script>
 
@@ -537,7 +538,7 @@ Calculator.prototype.saveSvg = function()
         <th>time</th>
         <th>drop</th>
       </tr> 
-      <tr ng-repeat="i in model" ng-class="{paralax: i.distance<9, tenmeters: i.distance % 10 == 0}" >
+      <tr ng-repeat="i in model" ng-class="{paralax: i.distance<9, tenmeters: i.distance % 10 == 0, twometers: i.distance % 2 == 0 && i.distance % 10 != 0 && i.distance>9}" >
         <td><input type="number" ng-model="i.reading"  style="width:45px"></td>
         <td>{{ i.distance<9 && (i.reading || "-") || i.interpolated }} </td>
         <td><button style="width:100%" ng-click="calculator.expandedModelDistance=i.distance; calculator.calcModel()">{{i.distance}}m</button></td>
