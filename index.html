@@ -386,7 +386,7 @@ Calculator.prototype.calcSvgModel = function()
     calcOneAngle(50, this.svgModel);
     
     if(!this.svg)
-        this.svg = SVG('scale').attr({ width:"94mm", height:"200mm", preserveAspectRatio:"none" }).viewbox(0,0,89,200)
+        this.svg = SVG('scale').attr({ width:"94mm", height:"200mm", preserveAspectRatio:"xMinYMin" }).viewbox(0,0,89,200)
     else
         this.svg.clear();
     
@@ -408,7 +408,7 @@ Calculator.prototype.calcSvgModel = function()
             w=0.4;
             
             if(m.angle == 0)
-                group.text(""+m.distance).size(1.2).move(m.reading - w/2.0 -0.50, y0 + 8.7);
+                group.text(""+m.distance).size(1.2).move(m.reading - w/2.0 -0.50, y0 + 8.8);
         }
         else if(m.distance % 2 == 0)
             h=0.5;
