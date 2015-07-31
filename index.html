@@ -408,7 +408,7 @@ Calculator.prototype.calcSvgModel = function()
             w=0.4;
             
             if(m.angle == 0)
-                group.text(""+m.distance).size(1.2).move(m.reading - w/2.0 -0.50, y0 + 8.275); // soewhat off in Safari, works in Chrome
+                group.text(""+m.distance).size(1.2).move(m.reading - w/2.0 -0.50, y0 + 8.7);
         }
         else if(m.distance % 2 == 0)
             h=0.5;
@@ -575,7 +575,6 @@ Calculator.prototype.saveSvg = function()
         <th>use</th>
       </tr>
       <tr ng-repeat="(key, value) in savedSettings">
-
         <td> {{ key }} </td>
         <td><button ng-click="loadSettings(key)">load</button></td>
         <td ng-repeat="item in savedSettings[key]"> {{ item.distance }}m {{ item.reading }} </td>
