@@ -3,6 +3,7 @@
     <title>Archery Scope Interpolation</title>
     <meta name="viewport" content="width=640" />
     <script src="svg.min.js"> </script>
+    <script src="FileSaver.min.js"> </script>
     <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.16/angular.min.js"></script>
     <style type="">
     .tdslope { width:250px }
@@ -408,7 +409,7 @@ Calculator.prototype.calcSvgModel = function()
             w=0.4;
             
             if(m.angle == 0)
-                group.text(""+m.distance).size(1.2).move(m.reading - w/2.0 -0.50, y0 + 8.8);
+                group.text(""+m.distance).size(1.2).move(m.reading - w/2.0 -0.50, y0 + 8.75);
         }
         else if(m.distance % 2 == 0)
             h=0.5;
@@ -457,34 +458,10 @@ Calculator.prototype.getParallaxReadings = function()
 
 Calculator.prototype.saveSvg = function()
 {
-    function errorHandler(e) { alert(e.message); console.log(e); }
-    function onInitFs(fs) {
-    
-      fs.root.getFile('log.txt', {create: true}, function(fileEntry) {
-    
-        // Create a FileWriter object for our FileEntry (log.txt).
-        fileEntry.createWriter(function(fileWriter) {
-    
-          fileWriter.onwriteend = function(e) {
-            console.log('Write completed.');
-          };
-    
-          fileWriter.onerror = function(e) {
-            console.log('Write failed: ' + e.toString());
-          };
-    
-          // Create a new Blob and write it to log.txt.
-          var bb = new BlobBuilder(); // Note: window.WebKitBlobBuilder in Chrome 12.
-          bb.append('Lorem Ipsum');
-          fileWriter.write(bb.getBlob('text/plain'));
-    
-        }, errorHandler);
-    
-      }, errorHandler);
-    
-    }
-
-    window.webkitRequestFileSystem(window.PERSISTENT, 65535, onInitFs, errorHandler);
+    //var svgdom = document.getElementById("svgxml").innerText;
+    var data = document.getElementById('scale').innerHTML;    
+    var blob = new Blob([ data ], {type: "image/svg+xml;charset=utf-8"});
+    saveAs(blob, "arrow.svg");
 };
 
 </script>
@@ -568,7 +545,7 @@ Calculator.prototype.saveSvg = function()
       </tr>
       </table>
       <br/>
-      Scope redings saved in local cache of your device ...
+      Scope redings saved in local cache of your device (iOS upgrade deletes them!)...
       <table id="readings">
       <tr>
         <th>name</th>
@@ -589,12 +566,19 @@ Calculator.prototype.saveSvg = function()
       <button ng-click="clearLocalStorage()">CLEAR DATA</button>
     </div>
       <br>
-      <button ng-click="calculator.calcSvgModel()">PLOT SCALE</button>
-      <input type="number" min="0.8" max="2" step="any" ng-model="inputs.svgScaleX" style="width:40px">
-      <!--button ng-click="calculator.saveSvg();">Save to file</button-->
-      <div id="scale" style="width:100mm; height:11mm; border:1px solid black;">
-      </div>
-    <pre id="svgxml">
+      <h3>Sureloc Scale</h3>
+<div id="scale" style="width:100mm; height:11mm; border:1px solid black;"></div>
+<pre id="svgxml"></pre>
+      <button ng-click="calculator.calcSvgModel()">Fine adjust svg SCALE for printing (0.8 ... 1.5)</button>
+      <input type="number" min="0.8" max="1.5" step="0.002" ng-model="inputs.svgScaleX" style="width:50px">
+      <button ng-click="calculator.saveSvg()">SAVE TO FILE</button>
+    <br/>
+    <pre>
+    1. copy SVG into a file arrow.svg: <button ng-click="calculator.saveSvg()">SAVE TO FILE</button>
+    2a. Delete the first 3 Bytes of the SVG file with a TextEditor, if SVG does not work (some bug out of my control somewhere)
+    2. open arrow.svg in Crome or Safari and print it.
+    3. (fine adjust scale and print final version, if needed)   
     </pre>
+    
 </body>
 </html>
