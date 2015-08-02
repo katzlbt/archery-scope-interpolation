@@ -298,8 +298,8 @@ Calculator.prototype.calcTable = function()
             this.scope.inputs.settings[n].reading = this.scope.model[i].reading;
             n++;
             
-            if(this.scope.model[i].distance < this.parallax) // must avoid paralax error!!
-                continue;
+            //if(this.scope.model[i].distance < this.parallax) // must avoid paralax error!!
+            //    continue;
             
             xs[xn] = this.scope.model[i].distance;
             ys[xn] = this.scope.model[i].reading;
@@ -344,9 +344,9 @@ Calculator.prototype.calcSlope = function()
         cd = Math.cos(50*d2r) * d; this.scope.model[i].down50 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
         
         var time = d/this.scope.inputs.v0;
-        var drop = 9.81/2.0*time*time;
+        var drop = 9.81/2.0*time*time*100;
         this.scope.model[i].time = time.toFixed(2);
-        this.scope.model[i].drop = drop.toFixed(1); // excludes drag / air resistance
+        this.scope.model[i].drop = drop.toFixed(0); // excludes drag / air resistance
     }
 };
 
@@ -461,7 +461,46 @@ Calculator.prototype.saveSvg = function()
     //var svgdom = document.getElementById("svgxml").innerText;
     var data = document.getElementById('scale').innerHTML;    
     var blob = new Blob([ data ], {type: "image/svg+xml;charset=utf-8"});
-    saveAs(blob, "arrow.svg", true);
+    saveAs(blob, "arrow.svg", true);  // true disables UTF-16/32 Byte Order Mark
+};
+
+Calculator.prototype.drawSvgShot = function()
+{
+    // similar as model, but for X,Y=distance,drop graph
+    var max = this.scope.inputs.maxDistance;
+    for(var j=0; j<this.scope.inputs.settings.length; j++) // do not discard user data
+        if(this.scope.inputs.settings[j].distance > max)
+            max = this.scope.inputs.settings[j].distance;
+                    
+    var step=1;
+    var distDropGraph = []; // [[x1,y1], ...]
+    var distScopeGraph = []; // [[x1,y1], ...]
+    for(var d = 0; d < max; d+=step) // d is the distance to the target           
+    {
+        if(typeof(this.scope.inputs.maxDistance) == "number" && d > max)
+            break;
+            
+        var time = d/this.scope.inputs.v0;
+        var drop = 9.81/2.0*time*time*10;
+        var tuple = [d, drop];
+        distDropGraph.push(tuple);
+        console.log(tuple);
+        
+        var scope = this.cubicSpline.evalSpline(d);
+        distScopeGraph.push([d, scope]);        
+    }                        
+
+    if(!this.shotSvg)
+        this.shotSvg = SVG('shotSVG').attr({ width:"300mm", height:"200mm", preserveAspectRatio:"xMinYMin" }).viewbox(0,0,300,200)
+    else
+        this.shotSvg.clear();
+    
+    var group = this.shotSvg.group().transform({scaleX: 3, scaleY:3 }); // 0..70 m, 0..300 cm
+    
+    group.fill('none').stroke({ width: 0.2 });
+    
+    group.polyline(distDropGraph);
+    group.polyline(distScopeGraph);    
 };
 
 </script>
@@ -491,11 +530,13 @@ Calculator.prototype.saveSvg = function()
         <th>Max Distance</th>
         <th>Velocity v0 (fps)</th>
         <th>Velocity v0 (m/s)</th>
+        <th>Eye-Arrow d (mm)</th>
       </tr>
       <tr>
         <td><input type="number" ng-model="inputs.maxDistance"></td>
         <td><input type="number" ng-model="inputs.v0fps"></td>
         <td><input type="number" ng-model="inputs.v0"></td>
+        <td><input type="number" ng-model="inputs.parallaxDistance"></td>
       </tr>
       </table>
       
@@ -527,7 +568,7 @@ Calculator.prototype.saveSvg = function()
         <td style="background-color:#A3D1FF">{{i.down40}}</td>
         <td style="background-color:#DDDDFF">{{i.down50}}</td>
         <td style="background-color:#FFF">{{i.time}}s</td>
-        <td style="background-color:#FFF">{{i.drop}}m</td>
+        <td style="background-color:#FFF">{{i.drop}}cm</td>
       </tr>
       <tr>
         <th><button ng-click="saveSettings()">save</button></th>
@@ -579,6 +620,7 @@ Calculator.prototype.saveSvg = function()
     2. open arrow.svg in Crome or Safari and print it.
     3. (fine adjust scale and print final version, if needed)   
     </pre>
-    
+<div id="shotSVG" style="width:210mm; height:200mm; border:1px solid black;"></div>
+      <button ng-click="calculator.drawSvgShot()">Draw Shot</button> X = Distance 0-70m Y = Arrow drop, Scope reading
 </body>
 </html>
