@@ -254,11 +254,14 @@ Calculator.prototype.calcModel = function()
     var i=0, step=1;
     for(var d = 4; d < max; d+=step) // d is the distance to the target           
     {
-        if(d>11) // above 11m switch to 2
-            step = 2;
-            
         if(d>=this.expandedModelDistance && d<this.expandedModelDistance+2)
             step = 0.25;
+        else
+        if(d>11) // above 11m switch to 2
+            step = 2;
+        else
+            step = 1;
+            
         
         if(typeof(this.scope.inputs.maxDistance) == "number" && d > max)
             break;
@@ -317,8 +320,8 @@ Calculator.prototype.calcTable = function()
 
     for(var i = 0; i < this.scope.model.length; i++)
     {
-        if(this.scope.model[i].distance < this.parallax) // must avoid paralax error!!
-            continue;
+        //if(this.scope.model[i].distance < this.parallax) // must avoid paralax error!!
+        //    continue;
             
         var y = this.cubicSpline.evalSpline(this.scope.model[i].distance);
         this.scope.model[i].interpolated = y.toFixed(2);
@@ -366,8 +369,8 @@ Calculator.prototype.calcSvgModel = function()
             
             minReading = Math.min(minReading, p.reading);
             console.log(a, p.reading, minReading);
-            if(p.reading <= minReading) // avoid plotting parallax area
-                model.push(p);
+            //if(p.reading <= minReading) // avoid plotting parallax area
+            //    model.push(p);
         }
         
         return minReading;
@@ -472,7 +475,7 @@ Calculator.prototype.drawSvgShot = function()
         if(this.scope.inputs.settings[j].distance > max)
             max = this.scope.inputs.settings[j].distance;
                     
-    var step=1;
+    var step=.5;
     var distDropGraph = []; // [[x1,y1], ...]
     var distScopeGraph = []; // [[x1,y1], ...]
     for(var d = 0; d < max; d+=step) // d is the distance to the target           

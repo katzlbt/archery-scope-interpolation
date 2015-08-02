@@ -1,6 +1,7 @@
 CACHE MANIFEST
-# V14
+# V15
 index.html
 svg.min.js
+FileSaver.min.js
 https://ajax.googleapis.com/ajax/libs/angularjs/1.3.16/angular.min.js
 
