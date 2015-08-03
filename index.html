@@ -148,7 +148,7 @@ function Calculator($rootScope)
     this.scope.inputs.maxDistance = 60;
     me.scope.inputs.v0 = 74;
     
-    this.parallax = 9; // meters
+    this.parallax = 11; // meters
     
     this.scope.$watch("inputs.maxDistance", function(){ me.calcModel(); }, true);
     this.scope.$watch("model", function(){ me.calcTable(); }, true);
@@ -369,8 +369,8 @@ Calculator.prototype.calcSvgModel = function()
             
             minReading = Math.min(minReading, p.reading);
             console.log(a, p.reading, minReading);
-            //if(p.reading <= minReading) // avoid plotting parallax area
-            //    model.push(p);
+            if(p.reading <= minReading) // avoid plotting parallax area
+                model.push(p);
         }
         
         return minReading;
@@ -467,7 +467,7 @@ Calculator.prototype.saveSvg = function()
     saveAs(blob, "arrow.svg", true);  // true disables UTF-16/32 Byte Order Mark
 };
 
-Calculator.prototype.drawSvgShot = function()
+Calculator.prototype.drawSvgShot = function(drawWhat)
 {
     // similar as model, but for X,Y=distance,drop graph
     var max = this.scope.inputs.maxDistance;
@@ -502,8 +502,10 @@ Calculator.prototype.drawSvgShot = function()
     
     group.fill('none').stroke({ width: 0.2 });
     
-    group.polyline(distDropGraph);
-    group.polyline(distScopeGraph);    
+    if(drawWhat==1)
+        group.polyline(distDropGraph);
+    else
+        group.polyline(distScopeGraph);    
 };
 
 </script>
@@ -556,40 +558,42 @@ Calculator.prototype.drawSvgShot = function()
         <th> m </th>
         <th>40&deg;</th>
         <th>50&deg;</th>
-        <th>time</th>
-        <th>drop</th>
+        <th>time s</th>
+        <th>drop cm</th>
       </tr> 
-      <tr ng-repeat="i in model" ng-class="{paralax: i.distance<9, tenmeters: i.distance % 10 == 0, twometers: i.distance % 2 == 0 && i.distance % 10 != 0 && i.distance>9}" >
+      <tr ng-repeat="i in model" ng-class="{paralax: i.distance<calculator.parallax, tenmeters: i.distance % 10 == 0, twometers: i.distance % 2 == 0 && i.distance % 10 != 0 && i.distance>9}" >
         <td><input type="number" ng-model="i.reading"  style="width:45px"></td>
-        <td>{{ i.distance<9 && (i.reading || "-") || i.interpolated }} </td>
+        <td>{{ i.interpolated }} </td>
         <td><button style="width:100%" ng-click="calculator.expandedModelDistance=i.distance; calculator.calcModel()">{{i.distance}}m</button></td>
-        <td>{{ i.distance<9 && "-" || i.delta1m }} </td>
-        <td style="background-color:#F5FAFF">{{i.down10}}</td>
-        <td style="background-color:#E0F0FF">{{i.down20}}</td>
-        <td style="background-color:#B8DBFF">{{i.down30}}</td>
+        <td>{{ i.delta1m }} </td>
+        <td style="background-color:#F5FAFF">{{ i.down10}}</td>
+        <td style="background-color:#E0F0FF">{{ i.distance < calculator.parallax && "" || i.down20}}</td>
+        <td style="background-color:#B8DBFF">{{ i.distance < calculator.parallax && "" || i.down30}}</td>
         <td>{{i.distance}}m</td>
-        <td style="background-color:#A3D1FF">{{i.down40}}</td>
-        <td style="background-color:#DDDDFF">{{i.down50}}</td>
-        <td style="background-color:#FFF">{{i.time}}s</td>
-        <td style="background-color:#FFF">{{i.drop}}cm</td>
+        <td style="background-color:#A3D1FF">{{ i.distance < calculator.parallax && "" || i.down40}}</td>
+        <td style="background-color:#DDDDFF">{{ i.distance < calculator.parallax && "" || i.down50}}</td>
+        <td style="background-color:#FFF">{{i.time}}</td>
+        <td style="background-color:#FFF">{{i.drop}}</td>
       </tr>
       <tr>
         <th><button ng-click="saveSettings()">save</button></th>
         <th> interpol </th>
         <th> &delta;/m </th>
         <th> m </th>
-        <th>10&deg;</th>
-        <th>20&deg;</th>
-        <th>30&deg;</th>
+        <th>10&deg; m</th>
+        <th>20&deg; m</th>
+        <th>30&deg; m</th>
         <th> m </th>
         <th>40&deg;</th>
         <th>50&deg;</th>
-        <th>time(v0)</th>
-        <th>drop(v0)</th>
+        <th>time s</th>
+        <th>drop cm</th>
       </tr>
       </table>
       <br/>
-      Scope redings saved in local cache of your device (iOS upgrade deletes them!)...
+      <h3>Scope Readings</h3>
+      <p>This is saved in local cache of your device! WARNING: iOS discards the local storage on 
+      every minor update of iOS! Make a bookmark or screenhot.</p>
       <table id="readings">
       <tr>
         <th>name</th>
@@ -606,8 +610,10 @@ Calculator.prototype.drawSvgShot = function()
       <label>Bookmark this arrow:</label>
       <a href="index.html?data={{ inputsURI }}">VisiCalc {{ inputs.settingsName }}</a>
       <p>Howto bookmark: (1) open/click the link, (2) create bookmark on phone or desktop, (3) repeat after changes!</p>
-      <p>Enter 3 readings to start. Arrow weight is not used in the interpolation. You can enter yard-readings even if it says meters, just dont mix y and m.</p>
-      <p>WARNING: iOS discards the local storage on every minor update of iOS!</p>
+      <p>Enter 3 readings to start: 18m, 30m, 60m. If you need parallax readings for 3D, shoot every distance 12m down to 4m. 
+      Arrow weight is not used in the interpolation. You can enter yard-readings even if it says meters, just dont mix y and m.
+      In the parallax-region optical parallax-error, which is function of the straight-line distance to target, outweights the 
+      arrow-drop, so fill them in manually</p>
       <button ng-click="clearLocalStorage()">CLEAR DATA</button>
     </div>
       <br>
@@ -624,6 +630,6 @@ Calculator.prototype.drawSvgShot = function()
     3. (fine adjust scale and print final version, if needed)   
     </pre>
 <div id="shotSVG" style="width:210mm; height:200mm; border:1px solid black;"></div>
-      <button ng-click="calculator.drawSvgShot()">Draw Shot</button> X = Distance 0-70m Y = Arrow drop, Scope reading
+     <button ng-click="calculator.drawSvgShot(1)">Draw Shot</button> <button ng-click="calculator.drawSvgShot(0)">Draw Scope Readings</button> X = Distance 0-70m Y = Arrow drop, Scope reading
 </body>
 </html>
