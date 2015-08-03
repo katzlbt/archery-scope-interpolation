@@ -427,15 +427,21 @@ Calculator.prototype.calcSvgModel = function()
     var px = this.getParallaxReadings();
     if(px)
     {
-        var z1 = "", z2 = "";
+        var z1 = "", z2 = "", z3 = "";
         for(var i=0;i< px.length; i++)
-            if(i<3)
+        {
+            if(i<4)
                 z1 += px[i]+" ";
-            else
+            else if(i<7)
                 z2 += px[i]+" ";
+            else
+                z3 += px[i]+" ";
+        }
         
-        group.text(z1).size(2.5).move(55, 3.4);
-        group.text(z2).size(2.5).move(55, 6);
+        var y = 3.2;
+        group.text(z1).size(2.5).move(55, y);
+        group.text(z2).size(2.5).move(58, y+2.6);
+        group.text(z3).size(2.5).move(61, y+2.6+2.6);
     }
     
     var xml= document.getElementById('scale').innerHTML;
@@ -449,11 +455,11 @@ Calculator.prototype.getParallaxReadings = function()
     
     for(var i = 0; i < this.scope.model.length; i++)
     {
-        if(this.scope.model[i].distance >= this.parallax) // normal
+        if(this.scope.model[i].distance > this.parallax) // normal
             continue;
             
         if(this.scope.model[i].reading > 0)
-            ret.push(this.scope.model[i].distance +"m/"+ this.scope.model[i].reading);
+            ret.push(this.scope.model[i].distance +"/"+ this.scope.model[i].reading);
     }
    
     return ret;
@@ -552,12 +558,12 @@ Calculator.prototype.drawSvgShot = function(drawWhat)
         <th colspan=2><input type="text" ng-model="inputs.settingsName" style="width:112px"></th>
         <th> m </th>
         <th> &delta;/m </th>
-        <th>10&deg;</th>
-        <th>20&deg;</th>
-        <th>30&deg;</th>
+        <th>10&deg; m</th>
+        <th>20&deg; m</th>
+        <th>30&deg; m</th>
         <th> m </th>
-        <th>40&deg;</th>
-        <th>50&deg;</th>
+        <th>40&deg; m</th>
+        <th>50&deg; m</th>
         <th>time s</th>
         <th>drop cm</th>
       </tr> 
@@ -567,11 +573,11 @@ Calculator.prototype.drawSvgShot = function(drawWhat)
         <td><button style="width:100%" ng-click="calculator.expandedModelDistance=i.distance; calculator.calcModel()">{{i.distance}}m</button></td>
         <td>{{ i.delta1m }} </td>
         <td style="background-color:#F5FAFF">{{ i.down10}}</td>
-        <td style="background-color:#E0F0FF">{{ i.distance < calculator.parallax && "" || i.down20}}</td>
-        <td style="background-color:#B8DBFF">{{ i.distance < calculator.parallax && "" || i.down30}}</td>
+        <td style="background-color:#E0F0FF">{{ i.distance < calculator.parallax && " " || i.down20}}</td>
+        <td style="background-color:#B8DBFF">{{ i.distance < calculator.parallax && " " || i.down30}}</td>
         <td>{{i.distance}}m</td>
-        <td style="background-color:#A3D1FF">{{ i.distance < calculator.parallax && "" || i.down40}}</td>
-        <td style="background-color:#DDDDFF">{{ i.distance < calculator.parallax && "" || i.down50}}</td>
+        <td style="background-color:#A3D1FF">{{ i.distance < calculator.parallax && " " || i.down40}}</td>
+        <td style="background-color:#DDDDFF">{{ i.distance < calculator.parallax && " " || i.down50}}</td>
         <td style="background-color:#FFF">{{i.time}}</td>
         <td style="background-color:#FFF">{{i.drop}}</td>
       </tr>
@@ -592,8 +598,9 @@ Calculator.prototype.drawSvgShot = function(drawWhat)
       </table>
       <br/>
       <h3>Scope Readings</h3>
-      <p>This is saved in local cache of your device! WARNING: iOS discards the local storage on 
-      every minor update of iOS! Make a bookmark or screenhot.</p>
+      <p>This is saved in local cache of your device!</br>
+      <b>WARNING: iOS discards the local storage on 
+      every minor update of iOS! Make a bookmark or screenhot.</b></p>
       <table id="readings">
       <tr>
         <th>name</th>
@@ -610,10 +617,12 @@ Calculator.prototype.drawSvgShot = function(drawWhat)
       <label>Bookmark this arrow:</label>
       <a href="index.html?data={{ inputsURI }}">VisiCalc {{ inputs.settingsName }}</a>
       <p>Howto bookmark: (1) open/click the link, (2) create bookmark on phone or desktop, (3) repeat after changes!</p>
-      <p>Enter 3 readings to start: 18m, 30m, 60m. If you need parallax readings for 3D, shoot every distance 12m down to 4m. 
-      Arrow weight is not used in the interpolation. You can enter yard-readings even if it says meters, just dont mix y and m.
+      <p>Enter 3 readings to start: 18m, 30m, 60m. If you need parallax readings for 3D, shoot every distance 12m down to 4m (in this order!). 
+      You can enter yard-readings even if it says meters, just dont mix y and m.
       In the parallax-region optical parallax-error, which is function of the straight-line distance to target, outweights the 
-      arrow-drop, so fill them in manually</p>
+      arrow-drop, so fill them in manually (as reading or meter).
+      Arrow weight (and also drag and parallax-error) are derived by the interpolation, changing values will not change the readings. 
+      Drop does not consider drag.</p>
       <button ng-click="clearLocalStorage()">CLEAR DATA</button>
     </div>
       <br>
