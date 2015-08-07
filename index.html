@@ -172,6 +172,15 @@ function Calculator($rootScope)
     this.scope.calculator = this;
 }
 
+Calculator.prototype.setExpandedModelDistance = function(d)
+{
+    var d = Math.floor(d/2)*2;
+    if(d == this.expandedModelDistance)
+        this.expandedModelDistance = 0;
+    else
+        this.expandedModelDistance = d;
+}
+
 function getParameterByName(name) {
     name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
     var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
@@ -506,12 +515,16 @@ Calculator.prototype.drawSvgShot = function(drawWhat)
     
     var group = this.shotSvg.group().transform({scaleX: 3, scaleY:3 }); // 0..70 m, 0..300 cm
     
-    group.fill('none').stroke({ width: 0.2 });
+    group.fill('none').stroke({ width: 0.06 });
     
+    // grid
+    for(var i=10;i<=60;i+=10)
+        group.line(i,0,i,300);
+        
     if(drawWhat==1)
-        group.polyline(distDropGraph);
+        group.polyline(distDropGraph).stroke({ width: 0.2 });
     else
-        group.polyline(distScopeGraph);    
+        group.polyline(distScopeGraph).stroke({ width: 0.2 });    
 };
 
 </script>
@@ -570,7 +583,7 @@ Calculator.prototype.drawSvgShot = function(drawWhat)
       <tr ng-repeat="i in model" ng-class="{paralax: i.distance<calculator.parallax, tenmeters: i.distance % 10 == 0, twometers: i.distance % 2 == 0 && i.distance % 10 != 0 && i.distance>9}" >
         <td><input type="number" ng-model="i.reading"  style="width:45px"></td>
         <td>{{ i.interpolated }} </td>
-        <td><button style="width:100%" ng-click="calculator.expandedModelDistance=i.distance; calculator.calcModel()">{{i.distance}}m</button></td>
+        <td><button style="width:100%" ng-click="calculator.setExpandedModelDistance(i.distance); calculator.calcModel()">{{i.distance}}m</button></td>
         <td>{{ i.delta1m }} </td>
         <td style="background-color:#F5FAFF">{{ i.down10}}</td>
         <td style="background-color:#E0F0FF">{{ i.distance < calculator.parallax && " " || i.down20}}</td>
