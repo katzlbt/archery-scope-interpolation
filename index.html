@@ -531,11 +531,18 @@ Calculator.prototype.drawSvgShot = function(drawWhat)
         group.polyline(distScopeGraph).stroke({ width: 0.2 });    
 };
 
-Calculator.prototype.transformScale = function(fromScopeReading, toScopeReading)
+Calculator.prototype.transformScale = function()
 {
-    var delta = toScopeReading - fromScopeReading;
+    if(!this.transformScaleTo || !this.transformScaleFrom)
+        return;
+            
+    var delta = this.transformScaleTo - this.transformScaleFrom;
     for(var j=0; j<this.scope.inputs.settings.length; j++) // do not discard user data
         this.scope.inputs.settings[j].reading += delta;
+        
+    this.transformScaleFrom = "";
+    this.transformScaleTo = "";
+    this.calcModel();    
 };
 
 </script>
@@ -620,6 +627,20 @@ Calculator.prototype.transformScale = function(fromScopeReading, toScopeReading)
         <th>drop cm</th>
       </tr>
       </table>
+      <table>
+      <tr>
+        <th>old scope reading</th>
+        <th>new scope reading</th>
+        <th></th>
+      </tr>
+      <tr>
+        <td><input type="number" ng-model="calculator.transformScaleFrom" placeholder="23.3" style="width:50px"></td>
+        <td><input type="number" ng-model="calculator.transformScaleTo" placeholder="23.1" style="width:50px"></td>
+        <td><button ng-click="calculator.transformScale()">shift scale</button>
+        </td>
+      </tr>
+      </table>
+      
       <br/>
       <h3>Scope Readings</h3>
       <p>This is saved in local cache of your device!</br>
