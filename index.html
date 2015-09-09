@@ -4,7 +4,7 @@
     <meta name="viewport" content="width=640" />
     <script src="svg.min.js"> </script>
     <script src="FileSaver.min.js"> </script>
-    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.16/angular.min.js"></script>
+    <script src="angular.min.js"></script>
     <style type="">
     .tdslope { width:250px }
     table { font-family:monospace; border-width:1px; border-collapse: collapse; border-style: solid; }
@@ -150,12 +150,12 @@ function Calculator($rootScope)
     
     this.parallax = 11; // meters
     
-    this.scope.$watch("inputs.maxDistance", function(){ me.calcModel(); }, true);
+    this.scope.$watch("inputs.maxDistance", function(){ me.calcModel(); });
     this.scope.$watch("model", function(){ me.calcTable(); }, true);
     
     this.load();
     
-    this.scope.$watch("inputsJSON", function(){ me.scope.inputsURI = encodeURIComponent(me.scope.inputsJSON); }, true);
+    this.scope.$watch("inputsJSON", function(){ me.scope.inputsURI = btoa ? btoa(me.scope.inputsJSON) : encodeURIComponent(me.scope.inputsJSON); }, true);
     
     this.scope.$watch("inputs.v0fps", function(){ me.scope.inputs.v0 = me.scope.inputs.v0fps * 0.3048; me.calcTable(); });
     
@@ -164,7 +164,9 @@ function Calculator($rootScope)
     this.scope.loadSettings = function(x) { me.loadSettings(x); };
     this.scope.deleteSettings = function(x) { if(confirm('Delete?')) { me.deleteSettings(x); } };
     
-    this.scope.$watch("inputs.arrow.name", function(){  document.title = me.scope.inputs.arrow.name; });
+    this.scope.$watch("inputs", function(){  
+        document.title = me.scope.inputs.settingsName; 
+        me.scope.inputsJSON = angular.toJson(me.scope.inputs); }, true);
     
     this.scope.inputs.svgScaleX = 1.0;
     this.scope.$watch("inputs.svgScaleX", function(){ me.calcSvgModel(); });
@@ -204,6 +206,8 @@ Calculator.prototype.load = function()
     if(data && confirm("Replace saved data from URL?") === true)
     {
         data = decodeURIComponent(data);
+        if(data.charAt(0)!="{")
+            data = atob(data);
         this.scope.inputs = angular.fromJson(data);
         return true;
     }
@@ -377,7 +381,7 @@ Calculator.prototype.calcSvgModel = function()
             p.reading = spline.evalSpline(realD);
             
             minReading = Math.min(minReading, p.reading);
-            console.log(a, p.reading, minReading);
+            //console.log(a, p.reading, minReading);
             if(p.reading <= minReading) // avoid plotting parallax area
                 model.push(p);
         }
@@ -502,7 +506,7 @@ Calculator.prototype.drawSvgShot = function(drawWhat)
         var drop = 9.81/2.0*time*time*10;
         var tuple = [d, drop];
         distDropGraph.push(tuple);
-        console.log(tuple);
+        //console.log(tuple);
         
         var scope = this.cubicSpline.evalSpline(d);
         distScopeGraph.push([d, scope]);        
@@ -525,6 +529,13 @@ Calculator.prototype.drawSvgShot = function(drawWhat)
         group.polyline(distDropGraph).stroke({ width: 0.2 });
     else
         group.polyline(distScopeGraph).stroke({ width: 0.2 });    
+};
+
+Calculator.prototype.transformScale = function(fromScopeReading, toScopeReading)
+{
+    var delta = toScopeReading - fromScopeReading;
+    for(var j=0; j<this.scope.inputs.settings.length; j++) // do not discard user data
+        this.scope.inputs.settings[j].reading += delta;
 };
 
 </script>
