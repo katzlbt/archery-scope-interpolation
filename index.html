@@ -1,7 +1,10 @@
+<!--html manifest="cache.manifest" ng-app="myApp"-->
 <html manifest="cache.manifest" ng-app="myApp">
 <head>
     <title>Archery Scope Interpolation</title>
-    <meta name="viewport" content="width=640" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link href='kghostview.png' rel='apple-touch-icon' type='image/png'>
     <script src="svg.min.js"> </script>
     <script src="FileSaver.min.js"> </script>
     <script src="angular.min.js"></script>
@@ -9,10 +12,13 @@
     .tdslope { width:250px }
     table { font-family:monospace; border-width:1px; border-collapse: collapse; border-style: solid; }
     td, th { min-width:50px; border-width:1px; border-style: solid; text-align:center; }
+    .tdcontrols { height:36px }
     .paralax { background-color: #CCC; }
     .paralax-wrong { text-decoration: line-through; }
     .tenmeters { background-color: #FCC; font-weight: bold }
     .twometers { background-color: #FFC; }
+    .storage-warning { max-width:260px; font-family:Helvetica; font-size:0.7rem; }
+    .helptext-td { max-width:360px; font-family:Helvetica; font-size:0.7rem; text-align: left; }
     </style>
 <script>
 
@@ -140,9 +146,10 @@ function Calculator($rootScope)
     
     var me = this;
     
-    this.scope.$watch("inputs.arrow.weightAll", function(){ me.scope.inputs.arrow.grams = me.scope.inputs.arrow.weightAll/me.scope.inputs.arrow.count; });
-    this.scope.$watch("inputs.arrow.count", function(){ me.scope.inputs.arrow.grams = me.scope.inputs.arrow.weightAll/me.scope.inputs.arrow.count; });
-    this.scope.$watch("inputs.arrow.grams", function(){ me.scope.inputs.arrow.grains = me.scope.inputs.arrow.grams * 15.432358; });
+    //this.scope.$watch("inputs.arrow.weightAll", function(){ me.scope.inputs.arrow.grams = me.scope.inputs.arrow.weightAll/me.scope.inputs.arrow.count; });
+    //this.scope.$watch("inputs.arrow.count", function(){ me.scope.inputs.arrow.grams = me.scope.inputs.arrow.weightAll/me.scope.inputs.arrow.count; });
+    //this.scope.$watch("inputs.arrow.grams", function(){ me.scope.inputs.arrow.grains = me.scope.inputs.arrow.grams * 15.432358; });
+    this.scope.$watch("inputs.arrow.name", function(){ me.scope.inputs.settingsName = me.scope.inputs.arrow.name + " " + (new Date()).toISOString().substring(2,10); });
     
     this.maxTable = 90;
     this.scope.inputs.maxDistance = 60;
@@ -168,6 +175,7 @@ function Calculator($rootScope)
         document.title = me.scope.inputs.settingsName; 
         me.scope.inputsJSON = angular.toJson(me.scope.inputs); }, true);
     
+    this.scope.showScaleAndSVG = false; // disables calcSvgModel()
     this.scope.inputs.svgScaleX = 1.0;
     this.scope.$watch("inputs.svgScaleX", function(){ me.calcSvgModel(); });
         
@@ -368,6 +376,9 @@ Calculator.prototype.calcSlope = function()
 
 Calculator.prototype.calcSvgModel = function()
 {
+    if(false == this.scope.showScaleAndSVG) // hidden
+        return;
+        
     this.svgModel = [];
     
     var spline = this.cubicSpline;
@@ -549,37 +560,43 @@ Calculator.prototype.transformScale = function()
 </head>
 <body>
     <div ng-controller="Calculator">
-      <table id="table">
+      <table id="table" style="min-width:260px">
       <tr>
         <th>Arrow Name</th>
-        <th>Arrow Weight (all)</th>
-        <th>Arrow Count</th>
-        <th>Arrow Weight (gram)</th>
+        <td><input type="text" ng-model="inputs.arrow.name"></td>
       </tr>
       <tr>
-        <td><input type="text" ng-model="inputs.settingsName"></td>
-        <td><input type="number" ng-model="inputs.arrow.weightAll"></td>
-        <td><input type="number" ng-model="inputs.arrow.count"></td>
-        <td><input type="number" ng-model="inputs.arrow.grams"></td>
+        <th>Arrow grains</th>
+        <td><input type="number" ng-model="inputs.arrow.grains"></td>
       </tr>
       <tr>
-        <td>grains</td>
-        <td>{{ (inputs.arrow.grains * inputs.arrow.count).toFixed(2) }}</td>
-        <td></td>
-        <td>{{ inputs.arrow.grains.toFixed(2) }}</td>
+        <th>V0 fps</th>
+        <td><input type="number" ng-model="inputs.v0fps"></td>
+      </tr>
+      <tr>
+        <th>V0 m/s</th>
+        <td><input type="number" ng-model="inputs.v0"></td>
       </tr>
       <tr>
         <th>Max Distance</th>
-        <th>Velocity v0 (fps)</th>
-        <th>Velocity v0 (m/s)</th>
-        <th>Eye-Arrow d (mm)</th>
+        <td><input type="number" ng-model="inputs.maxDistance"></td>
       </tr>
       <tr>
-        <td><input type="number" ng-model="inputs.maxDistance"></td>
-        <td><input type="number" ng-model="inputs.v0fps"></td>
-        <td><input type="number" ng-model="inputs.v0"></td>
-        <td><input type="number" ng-model="inputs.parallaxDistance"></td>
+        <th>Show drop</th>
+        <td><input type="checkbox" ng-model="showDrop"></td>
       </tr>
+      <!-- tr>
+        <th>Inclinations</th>
+        <td><input type="checkbox" ng-model="inputs.showInclination"></td>
+      </tr -->
+      <!-- tr>
+        <th>Unit Meters</th>
+        <td><input type="checkbox" ng-model="inputs.useMeters"></td>
+      </tr-->
+      <!-- tr>
+        <th>Eye-Arrow d (mm)</th>
+        <td><input type="number" ng-model="inputs.parallaxDistance"></td>
+      </tr -->
       </table>
       
       <br/>
@@ -589,87 +606,103 @@ Calculator.prototype.transformScale = function()
         <th colspan=2><input type="text" ng-model="inputs.settingsName" style="width:112px"></th>
         <th> m </th>
         <th> &delta;/m </th>
-        <th>10&deg; m</th>
+        <!-- th>10&deg; m</th>
         <th>20&deg; m</th>
         <th>30&deg; m</th>
         <th> m </th>
         <th>40&deg; m</th>
-        <th>50&deg; m</th>
-        <th>time s</th>
-        <th>drop cm</th>
+        <th>50&deg; m</th -->
+        <th ng-show="showDrop">time s</th>
+        <th ng-show="showDrop">drop cm</th>
       </tr> 
       <tr ng-repeat="i in model" ng-class="{paralax: i.distance<calculator.parallax, tenmeters: i.distance % 10 == 0, twometers: i.distance % 2 == 0 && i.distance % 10 != 0 && i.distance>9}" >
         <td><input type="number" ng-model="i.reading"  style="width:45px"></td>
         <td>{{ i.interpolated }} </td>
         <td><button style="width:100%" ng-click="calculator.setExpandedModelDistance(i.distance); calculator.calcModel()">{{i.distance}}m</button></td>
         <td>{{ i.delta1m }} </td>
-        <td style="background-color:#F5FAFF">{{ i.down10}}</td>
+        <!-- td style="background-color:#F5FAFF">{{ i.down10}}</td>
         <td style="background-color:#E0F0FF">{{ i.distance < calculator.parallax && " " || i.down20}}</td>
         <td style="background-color:#B8DBFF">{{ i.distance < calculator.parallax && " " || i.down30}}</td>
         <td>{{i.distance}}m</td>
         <td style="background-color:#A3D1FF">{{ i.distance < calculator.parallax && " " || i.down40}}</td>
-        <td style="background-color:#DDDDFF">{{ i.distance < calculator.parallax && " " || i.down50}}</td>
-        <td style="background-color:#FFF">{{i.time}}</td>
-        <td style="background-color:#FFF">{{i.drop}}</td>
+        <td style="background-color:#DDDDFF">{{ i.distance < calculator.parallax && " " || i.down50}}</td -->
+        <td ng-show="showDrop" style="background-color:#FFF">{{i.time}}</td>
+        <td ng-show="showDrop" style="background-color:#FFF">{{i.drop}}</td>
+      </tr>
+      <tr class="tdcontrols">
+        <th>Save</th>
+        <td colspan="99"><button ng-click="saveSettings()">local save</button></td>
+      </tr>
+      <tr class="tdcontrols">
+        <th>Bookmark</th>
+        <td colspan="99"><a href="index.html?data={{ inputsURI }}" target="_blank">{{ inputs.settingsName }}</a></td>
       </tr>
       <tr>
-        <th><button ng-click="saveSettings()">save</button></th>
-        <th> interpol </th>
-        <th> &delta;/m </th>
-        <th> m </th>
-        <th>10&deg; m</th>
-        <th>20&deg; m</th>
-        <th>30&deg; m</th>
-        <th> m </th>
-        <th>40&deg;</th>
-        <th>50&deg;</th>
-        <th>time s</th>
-        <th>drop cm</th>
-      </tr>
-      </table>
-      <table>
-      <tr>
-        <th>old scope reading</th>
-        <th>new scope reading</th>
-        <th></th>
-      </tr>
-      <tr>
-        <td><input type="number" ng-model="calculator.transformScaleFrom" placeholder="23.3" style="width:50px"></td>
-        <td><input type="number" ng-model="calculator.transformScaleTo" placeholder="23.1" style="width:50px"></td>
-        <td><button ng-click="calculator.transformScale()">shift scale</button>
-        </td>
+        <td colspan="6" class="storage-warning">iOS and Android may discard this local data occasionally! Make a bookmark or a screenshot.</td>
       </tr>
       </table>
       
+      
+      
       <br/>
-      <h3>Scope Readings</h3>
-      <p>This is saved in local cache of your device!</br>
-      <b>WARNING: iOS discards the local storage on 
-      every minor update of iOS! Make a bookmark or screenhot.</b></p>
-      <table id="readings">
+      <table>
       <tr>
-        <th>name</th>
-        <th>use</th>
+        <th>old reading</th>
+        <td><input type="number" ng-model="calculator.transformScaleFrom" placeholder="23.3" style="width:50px"></td>
       </tr>
-      <tr ng-repeat="(key, value) in savedSettings">
-        <td> {{ key }} </td>
-        <td><button ng-click="loadSettings(key)">load</button></td>
-        <td ng-repeat="item in savedSettings[key]"> {{ item.distance }}m {{ item.reading }} </td>
-        <td><button ng-click="deleteSettings(key)">delete</button></td>
+      <tr>
+        <th>new reading</th>
+        <td><input type="number" ng-model="calculator.transformScaleTo" placeholder="23.1" style="width:50px"></td>
+      </tr>
+      <tr>
+        <td><button ng-click="calculator.transformScale()">shift scale</button></td>
       </tr>
       </table>
       <br/>
+            
+      
+      <table id="readings">
+      <tr>
+        <th>Saved reading</th>
+        <th>Use</th>
+      </tr>
+      <tr ng-repeat="(key, value) in savedSettings">
+        <td><a href="" ng-click="showSavedReadingsExpanded=!showSavedReadingsExpanded">{{ key }}</a></td>
+        <td><button ng-click="loadSettings(key)">load</button></td>
+        <td ng-if="showSavedReadingsExpanded" ng-repeat="item in savedSettings[key]"> {{ item.distance }}m {{ item.reading }} </td>
+        <td ng-if="showSavedReadingsExpanded"><button ng-click="deleteSettings(key)">delete</button></td>
+      </tr>
+      <tr>
+        <td colspan="6" class="storage-warning">iOS and Android may discard this local data occasionally! Make a bookmark or a screenshot.</td>
+      </tr>
+      </table>
+      <br/>
+      
+      
+  <table>
+  <tr>
+      <th style="width:360px;"><a href="" ng-click="showHelp=!showHelp">Instructions</a></th>
+  </tr>
+  <tr ng-show="showHelp">
+      <td class="helptext-td">
+          <p>Enter 3 readings to start: 18m, 30m, 60m. If you need parallax readings for 3D, shoot every distance 12m down to 4m (in this order!). 
+      You can enter yard-readings even if it says meters, just dont mix y and m.
+      In the parallax-region optical parallax-error, which is function of the straight-line distance to target, outweights the 
+      arrow-drop, so fill in these readings manually. Drop does not consider drag.</p>
       <label>Bookmark this arrow:</label>
       <a href="index.html?data={{ inputsURI }}">VisiCalc {{ inputs.settingsName }}</a>
       <p>Howto bookmark: (1) open/click the link, (2) create bookmark on phone or desktop, (3) repeat after changes!</p>
-      <p>Enter 3 readings to start: 18m, 30m, 60m. If you need parallax readings for 3D, shoot every distance 12m down to 4m (in this order!). 
-      You can enter yard-readings even if it says meters, just dont mix y and m.
-      In the parallax-region optical parallax-error, which is function of the straight-line distance to target, outweights the 
-      arrow-drop, so fill them in manually (as reading or meter).
-      Arrow weight (and also drag and parallax-error) are derived by the interpolation, changing values will not change the readings. 
-      Drop does not consider drag.</p>
+      <p></p>
       <button ng-click="clearLocalStorage()">CLEAR DATA</button>
+      </td>
+   </tr>
+   </table>
     </div>
+
+    <!-- Advanced Stuff Desktop ... -->
+    <br/>
+    <a href="" ng-click="showScaleAndSVG=!showScaleAndSVG">Show Scale-Graph and Shot-Graph (Desktop)</a>
+    <div ng-if="showScaleAndSVG">
       <br>
       <h3>Sureloc Scale</h3>
 <div id="scale" style="width:100mm; height:11mm; border:1px solid black;"></div>
@@ -685,5 +718,7 @@ Calculator.prototype.transformScale = function()
     </pre>
 <div id="shotSVG" style="width:210mm; height:200mm; border:1px solid black;"></div>
      <button ng-click="calculator.drawSvgShot(1)">Draw Shot</button> <button ng-click="calculator.drawSvgShot(0)">Draw Scope Readings</button> X = Distance 0-70m Y = Arrow drop, Scope reading
+   </div>
+   
 </body>
 </html>
