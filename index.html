@@ -1,4 +1,3 @@
-<!--html manifest="cache.manifest" ng-app="myApp"-->
 <html manifest="cache.manifest" ng-app="myApp">
 <head>
     <title>Archery Scope Interpolation</title>
@@ -10,7 +9,7 @@
     <script src="angular.min.js"></script>
     <style type="">
     .tdslope { width:250px }
-    table { font-family:monospace; border-width:1px; border-collapse: collapse; border-style: solid; }
+    table { margin:auto; font-family:monospace; border-width:1px; border-collapse: collapse; border-style: solid; }
     td, th { min-width:50px; border-width:1px; border-style: solid; text-align:center; }
     .tdcontrols { height:36px }
     .paralax { background-color: #CCC; }
@@ -138,8 +137,11 @@ function Calculator($rootScope)
     DEBUG_SCOPE = $rootScope;
     
     this.scope.inputs = { 
-        arrow:{ weight:74, count:6, weightAll:156 },
-        settings:[] // { distance:, reading: }
+        arrow:{ grains:400, name:"Arrow One" },
+        settings:[], // { distance:, reading: }
+        v0fps:245,
+        v0:74,
+        maxDistance:60
         };
     
     this.scope.savedSettings = {};
@@ -152,8 +154,6 @@ function Calculator($rootScope)
     this.scope.$watch("inputs.arrow.name", function(){ me.scope.inputs.settingsName = me.scope.inputs.arrow.name + " " + (new Date()).toISOString().substring(2,10); });
     
     this.maxTable = 90;
-    this.scope.inputs.maxDistance = 60;
-    me.scope.inputs.v0 = 74;
     
     this.parallax = 11; // meters
     
@@ -166,7 +166,7 @@ function Calculator($rootScope)
     
     this.scope.$watch("inputs.v0fps", function(){ me.scope.inputs.v0 = me.scope.inputs.v0fps * 0.3048; me.calcTable(); });
     
-    this.scope.clearLocalStorage = function() { localStorage.removeItem('scopeinputs');  me.clearInputs(); };
+    this.scope.clearLocalStorage = function() { me.clear(); };
     this.scope.saveSettings = function() { me.saveSettings(); };
     this.scope.loadSettings = function(x) { me.loadSettings(x); };
     this.scope.deleteSettings = function(x) { if(confirm('Delete?')) { me.deleteSettings(x); } };
@@ -198,44 +198,57 @@ function getParameterByName(name) {
     return results == null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
 }
 
-Calculator.prototype.clearInputs = function()
-{
-    this.scope.inputs.maxDistance = 60;
-    this.scope.inputs.settings = [];
-};
-
 Calculator.prototype.load = function()
 {
-    var ls = localStorage.getItem('savedSettings');
+    var ls = localStorage.getItem('ARCHISCOPE_savedSettings');
     if(ls)
         this.scope.savedSettings = angular.fromJson(ls);
 
-    var data = getParameterByName("data");
-    if(data && confirm("Replace saved data from URL?") === true)
+    var inp = localStorage.getItem('ARCHISCOPE_scopeinputs');
+    if(inp)
     {
-        data = decodeURIComponent(data);
-        if(data.charAt(0)!="{")
-            data = atob(data);
-        this.scope.inputs = angular.fromJson(data);
-        return true;
+        this.scope.inputsJSON = inp;
+        this.scope.inputs = angular.fromJson(inp);
     }
-
-    var inp = localStorage.getItem('scopeinputs');
-    if(!inp || inp==="undefined")
-        return false;
-        
-    this.scope.inputsJSON = inp;
-    this.scope.inputs = angular.fromJson(inp);
     
-    return true;
+    var data = getParameterByName("data");
+    if(data)
+    {
+        var calcIntHash = function(s){
+          return s.split("").reduce(function(a,b){a=((a<<5)-a)+b.charCodeAt(0);return a&a},0);              
+        }
+        
+        // avoid confirm on every opening of page, only if data= is new
+        var hash = calcIntHash(data);
+        if(hash != this.scope.inputs.dataParamHash && confirm("Replace saved data from URL?") === true)
+        {
+            data = decodeURIComponent(data);
+            if(data.charAt(0)!="{")
+                data = atob(data);
+                
+            this.scope.inputs = angular.fromJson(data);
+            this.scope.inputs.dataParamHash = hash;
+            this.save();
+        }
+    }    
 };
 
 Calculator.prototype.save = function()
 {
     this.scope.inputsJSON = angular.toJson(this.scope.inputs);
-    localStorage.setItem('scopeinputs', this.scope.inputsJSON);
+    localStorage.setItem('ARCHISCOPE_scopeinputs', this.scope.inputsJSON);
     var json = angular.toJson(this.scope.savedSettings);
-    localStorage.setItem('savedSettings', json);
+    localStorage.setItem('ARCHISCOPE_savedSettings', json);
+};
+
+Calculator.prototype.clear = function()
+{
+    // localStorage.clear(); removes all site settings, scoresheets, etc.
+    
+    localStorage.removeItem('ARCHISCOPE_scopeinputs');
+    localStorage.removeItem('ARCHISCOPE_savedSettings');
+    
+    window.location.search="?reload=1";
 };
 
 Calculator.prototype.saveSettings = function()
@@ -692,33 +705,43 @@ Calculator.prototype.transformScale = function()
       <label>Bookmark this arrow:</label>
       <a href="index.html?data={{ inputsURI }}">VisiCalc {{ inputs.settingsName }}</a>
       <p>Howto bookmark: (1) open/click the link, (2) create bookmark on phone or desktop, (3) repeat after changes!</p>
-      <p></p>
-      <button ng-click="clearLocalStorage()">CLEAR DATA</button>
+      <p>CLEAR ALL SAVED DATA INSTANTLY: <button ng-click="clearLocalStorage()">CLEAR</button></p>
       </td>
    </tr>
    </table>
     </div>
 
     <!-- Advanced Stuff Desktop ... -->
-    <br/>
-    <a href="" ng-click="showScaleAndSVG=!showScaleAndSVG">Show Scale-Graph and Shot-Graph (Desktop)</a>
+    <center>
+        <br/>
+        <a href="" ng-click="showScaleAndSVG=!showScaleAndSVG">Show Scope Graphs</a>
+        <br/>
+    </center>
     <div ng-if="showScaleAndSVG">
-      <br>
-      <h3>Sureloc Scale</h3>
-<div id="scale" style="width:100mm; height:11mm; border:1px solid black;"></div>
-<pre id="svgxml"></pre>
-      <button ng-click="calculator.calcSvgModel()">Fine adjust svg SCALE for printing (0.8 ... 1.5)</button>
-      <input type="number" min="0.8" max="1.5" step="0.002" ng-model="inputs.svgScaleX" style="width:50px">
-      <button ng-click="calculator.saveSvg()">SAVE TO FILE</button>
-    <br/>
-    <pre>
-    1. copy SVG into a file arrow.svg: <button ng-click="calculator.saveSvg()">SAVE TO FILE</button>
-    2. open arrow.svg in Crome or Safari and print it.
-    3. (fine adjust scale and print final version, if needed)   
-    </pre>
-<div id="shotSVG" style="width:210mm; height:200mm; border:1px solid black;"></div>
-     <button ng-click="calculator.drawSvgShot(1)">Draw Shot</button> <button ng-click="calculator.drawSvgShot(0)">Draw Scope Readings</button> X = Distance 0-70m Y = Arrow drop, Scope reading
-   </div>
+        <br/>
+        <div id="shotSVG" style="margin:auto; width:210mm; height:200mm; border:1px solid black;">
+        </div>
+        <br/>
+        <center>
+            <button ng-click="calculator.drawSvgShot(0)">Draw Scope Readings</button>
+            <button ng-click="calculator.drawSvgShot(1)">Draw Shot</button>
+            X = Distance 0-70m Y = Arrow drop, Scope reading
+        </center>
+        <h3>Sureloc Scale</h3>
+        <div id="scale" style="width:100mm; height:11mm; border:1px solid black;"></div>
+        <pre id="svgxml"></pre>
+        <button ng-click="calculator.calcSvgModel()">Fine adjust svg SCALE for printing (0.8 ... 1.5)</button>
+        <input type="number" min="0.8" max="1.5" step="0.002" ng-model="inputs.svgScaleX" style="width:50px">
+        <button ng-click="calculator.saveSvg()">SAVE TO FILE</button>
+        <br/>
+        <pre>
+            1. copy SVG into a file arrow.svg: <button ng-click="calculator.saveSvg()">SAVE TO FILE</button>
+            2. open arrow.svg in Crome or Safari and print it.
+            3. (fine adjust scale and print final version, if needed)   
+        </pre>
+            
+
+    </div>
    
 </body>
 </html>
