@@ -170,7 +170,7 @@ function Calculator($rootScope)
     
     this.load();
     
-    this.scope.$watch("inputsJSON", function(){ me.scope.inputsURI = btoa ? btoa(me.scope.inputsJSON) : encodeURIComponent(me.scope.inputsJSON); }, true);
+    this.scope.$watch("inputsJSON", function(){ me.scope.inputsURI = btoa ? encodeURIComponent(btoa(me.scope.inputsJSON)) : "ERROR_btoa_not_supported"; }, true);
     
     this.scope.$watch("inputs.v0fps", function(){ me.scope.inputs.v0 = Math.round(me.scope.inputs.v0fps * 0.3048); me.calcTable(); });
     
@@ -203,7 +203,7 @@ function getParameterByName(name) {
     name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
     var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
         results = regex.exec(location.search);
-    return results == null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+    return results == null ? "" : results[1];
 }
 
 Calculator.prototype.load = function()
@@ -228,7 +228,7 @@ Calculator.prototype.load = function()
         
         // avoid confirm on every opening of page, only if data= is new
         var hash = calcIntHash(data);
-        if(hash != this.scope.inputs.dataParamHash)
+        if(hash != this.scope._dataParamHash)
         {
             data = decodeURIComponent(data);
             
@@ -238,14 +238,14 @@ Calculator.prototype.load = function()
             }
             catch(e) 
             {
-                alert("Passed scope readings cannot be decoded! The data is invalid. iOS10/MacOS randomly truncates some URLs: " + e.name);
+                alert("Passed scope readings cannot be decoded! The data is invalid. " + e.name);
                 return;
             }
             
             if(confirm("Replace saved data from URL?") === true)
             {
                 this.scope.inputs = angular.fromJson(data);
-                this.scope.inputs.dataParamHash = hash;
+                this.scope._dataParamHash = hash;
                 this.save();
             }
         }
