@@ -1,6 +1,7 @@
-<html manifest="cache.manifest" ng-app="myApp">
+<html manifest="cache.manifest" ng-app="myApp" content="text/html;charset=UTF-8">
 <head>
     <title>Archery Scope Interpolation</title>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link href='kghostview.png' rel='apple-touch-icon' type='image/png'>
@@ -18,6 +19,13 @@
     .twometers { background-color: #FFC; }
     .storage-warning { max-width:260px; font-family:Helvetica; font-size:0.7rem; }
     .helptext-td { max-width:360px; font-family:Helvetica; font-size:0.7rem; text-align: left; }
+        
+    @media print 
+    { 
+        table { page-break-after:always; }
+        tr    { page-break-inside:avoid; page-break-after:auto }
+        .do-not-print { display:none; } 
+    }
     </style>
 <script>
 
@@ -164,7 +172,7 @@ function Calculator($rootScope)
     
     this.scope.$watch("inputsJSON", function(){ me.scope.inputsURI = btoa ? btoa(me.scope.inputsJSON) : encodeURIComponent(me.scope.inputsJSON); }, true);
     
-    this.scope.$watch("inputs.v0fps", function(){ me.scope.inputs.v0 = me.scope.inputs.v0fps * 0.3048; me.calcTable(); });
+    this.scope.$watch("inputs.v0fps", function(){ me.scope.inputs.v0 = Math.round(me.scope.inputs.v0fps * 0.3048); me.calcTable(); });
     
     this.scope.clearLocalStorage = function() { me.clear(); };
     this.scope.saveSettings = function() { me.saveSettings(); };
@@ -361,6 +369,8 @@ Calculator.prototype.calcTable = function()
         this.scope.model[i].interpolated = y.toFixed(2);
         var y2 = this.cubicSpline.evalSpline(this.scope.model[i].distance+1);
         this.scope.model[i].delta1m = (y2-y).toFixed(2);
+        if(i>0) // 2nd derivative of change
+            this.scope.model[i].delta2nd= (this.scope.model[i].delta1m - this.scope.model[i-1].delta1m).toFixed(2);
     }
     
     this.calcSlope();
@@ -384,6 +394,10 @@ Calculator.prototype.calcSlope = function()
         var drop = 9.81/2.0*time*time*100;
         this.scope.model[i].time = time.toFixed(2);
         this.scope.model[i].drop = drop.toFixed(0); // excludes drag / air resistance
+        
+        var t1 = (d-1)/this.scope.inputs.v0;
+        var d1 = 9.81/2.0*t1*t1*100; // *100 cm
+        this.scope.model[i].deltaScope = Math.round((drop-d1)/this.scope.model[i].delta1m);  // 1 REV on scope is x cm on target 
     }
 };
 
@@ -590,11 +604,11 @@ Calculator.prototype.transformScale = function()
         <th>V0 m/s</th>
         <td><input type="number" ng-model="inputs.v0"></td>
       </tr>
-      <tr>
+      <tr class="do-not-print">
         <th>Max Distance</th>
         <td><input type="number" ng-model="inputs.maxDistance"></td>
       </tr>
-      <tr>
+      <tr class="do-not-print">
         <th>Show drop</th>
         <td><input type="checkbox" ng-model="showDrop"></td>
       </tr>
@@ -627,12 +641,13 @@ Calculator.prototype.transformScale = function()
         <th>50&deg; m</th -->
         <th ng-show="showDrop">time s</th>
         <th ng-show="showDrop">drop cm</th>
+        <th ng-show="showDrop">cm/rev</th>
       </tr> 
       <tr ng-repeat="i in model" ng-class="{paralax: i.distance<calculator.parallax, tenmeters: i.distance % 10 == 0, twometers: i.distance % 2 == 0 && i.distance % 10 != 0 && i.distance>9}" >
         <td><input type="number" ng-model="i.reading"  style="width:45px"></td>
         <td>{{ i.interpolated }} </td>
         <td><button style="width:100%" ng-click="calculator.setExpandedModelDistance(i.distance); calculator.calcModel()">{{i.distance}}m</button></td>
-        <td>{{ i.delta1m }} </td>
+        <td ng-style="i.delta2nd<0 && i.distance>20 ? {'background-color':'#F00'} : {}">{{ i.delta1m }}</td>
         <!-- td style="background-color:#F5FAFF">{{ i.down10}}</td>
         <td style="background-color:#E0F0FF">{{ i.distance < calculator.parallax && " " || i.down20}}</td>
         <td style="background-color:#B8DBFF">{{ i.distance < calculator.parallax && " " || i.down30}}</td>
@@ -641,16 +656,17 @@ Calculator.prototype.transformScale = function()
         <td style="background-color:#DDDDFF">{{ i.distance < calculator.parallax && " " || i.down50}}</td -->
         <td ng-show="showDrop" style="background-color:#FFF">{{i.time}}</td>
         <td ng-show="showDrop" style="background-color:#FFF">{{i.drop}}</td>
+        <td ng-show="showDrop" style="background-color:#FFF">{{i.deltaScope}}</td>
       </tr>
-      <tr class="tdcontrols">
+      <tr class="tdcontrols do-not-print">
         <th>Save</th>
         <td colspan="99"><button ng-click="saveSettings()">local save</button></td>
       </tr>
-      <tr class="tdcontrols">
+      <tr class="tdcontrols do-not-print">
         <th>Bookmark</th>
         <td colspan="99"><a href="index.html?data={{ inputsURI }}" target="_blank">{{ inputs.settingsName }}</a></td>
       </tr>
-      <tr>
+      <tr class="do-not-print">
         <td colspan="6" class="storage-warning">iOS and Android may discard this local data occasionally! Make a bookmark or a screenshot.</td>
       </tr>
       </table>
@@ -658,7 +674,7 @@ Calculator.prototype.transformScale = function()
       
       
       <br/>
-      <table>
+      <table class="do-not-print">
       <tr>
         <th>old reading</th>
         <td><input type="number" ng-model="calculator.transformScaleFrom" placeholder="23.3" style="width:50px"></td>
@@ -674,7 +690,7 @@ Calculator.prototype.transformScale = function()
       <br/>
             
       
-      <table id="readings">
+      <table id="readings" class="do-not-print">
       <tr>
         <th>Saved reading</th>
         <th>Use</th>
@@ -692,7 +708,7 @@ Calculator.prototype.transformScale = function()
       <br/>
       
       
-  <table>
+  <table class="do-not-print">
   <tr>
       <th style="width:360px;"><a href="" ng-click="showHelp=!showHelp">Instructions</a></th>
   </tr>
@@ -702,9 +718,8 @@ Calculator.prototype.transformScale = function()
       You can enter yard-readings even if it says meters, just dont mix y and m.
       In the parallax-region optical parallax-error, which is function of the straight-line distance to target, outweights the 
       arrow-drop, so fill in these readings manually. Drop does not consider drag.</p>
-      <label>Bookmark this arrow:</label>
-      <a href="index.html?data={{ inputsURI }}">VisiCalc {{ inputs.settingsName }}</a>
-      <p>Howto bookmark: (1) open/click the link, (2) create bookmark on phone or desktop, (3) repeat after changes!</p>
+      <p>Browser vendors decided to make local storage different between HTTPS and HTTPS (secure) versions of the page! Google announced to disable local storage on not HTTPS accessed pages.</p>
+      <p>Howto bookmark: (1) open/click the link "Bookmark" above to open in default webbrowser, (2) create bookmark on phone or desktop, (3) repeat after changes!</p>
       <p>CLEAR ALL SAVED DATA INSTANTLY: <button ng-click="clearLocalStorage()">CLEAR</button></p>
       </td>
    </tr>
