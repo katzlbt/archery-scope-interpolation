@@ -228,15 +228,26 @@ Calculator.prototype.load = function()
         
         // avoid confirm on every opening of page, only if data= is new
         var hash = calcIntHash(data);
-        if(hash != this.scope.inputs.dataParamHash && confirm("Replace saved data from URL?") === true)
+        if(hash != this.scope.inputs.dataParamHash)
         {
             data = decodeURIComponent(data);
-            if(data.charAt(0)!="{")
+            
+            try
+            {
                 data = atob(data);
-                
-            this.scope.inputs = angular.fromJson(data);
-            this.scope.inputs.dataParamHash = hash;
-            this.save();
+            }
+            catch(e) 
+            {
+                alert("Passed scope readings cannot be decoded! The data is invalid. iOS10/MacOS randomly truncates some URLs: " + e.name);
+                return;
+            }
+            
+            if(confirm("Replace saved data from URL?") === true)
+            {
+                this.scope.inputs = angular.fromJson(data);
+                this.scope.inputs.dataParamHash = hash;
+                this.save();
+            }
         }
     }    
 };
