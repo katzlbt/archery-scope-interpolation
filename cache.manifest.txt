@@ -1,8 +1,9 @@
 CACHE MANIFEST
-# V27 ... will be copied to cache.manifest by install.sh
+# V28 ... will be copied to cache.manifest by install.sh
 index.html
 svg.min.js
 FileSaver.min.js
 angular.min.js
 kghostview.png
+numeric-1.2.6.js
 

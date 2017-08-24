@@ -8,6 +8,7 @@
     <script src="svg.min.js"> </script>
     <script src="FileSaver.min.js"> </script>
     <script src="angular.min.js"></script>
+    <script src="numeric-1.2.6.js"></script>
     <style type="">
     .tdslope { width:250px }
     table { margin:auto; font-family:monospace; border-width:1px; border-collapse: collapse; border-style: solid; }
@@ -139,6 +140,34 @@
 		return q;
 	};
 
+	function polynomialCurveFitting(xArray, yArray)
+	{
+        order = 2;
+        
+        var xMatrix = [];
+        var xTemp = [];
+        var yMatrix = numeric.transpose([yArray]);
+        
+        for (j=0;j<xArray.length;j++)
+        {
+            xTemp = [];
+            for(i=0;i<=order;i++)
+            {
+                xTemp.push(1*Math.pow(xArray[j],i));
+            }
+            xMatrix.push(xTemp);
+        }
+        
+        var xMatrixT = numeric.transpose(xMatrix);
+        var dot1 = numeric.dot(xMatrixT,xMatrix);
+        var dotInv = numeric.inv(dot1);
+        var dot2 = numeric.dot(xMatrixT,yMatrix);
+        var solution = numeric.dot(dotInv,dot2);
+        console.log("Coefficients a + bx^1 + cx^2...");
+        console.log(solution);
+        return solution;
+    };
+	
 function Calculator($rootScope)
 {
     this.scope = $rootScope;
@@ -254,8 +283,12 @@ Calculator.prototype.load = function()
 
 Calculator.prototype.save = function()
 {
+    document.title = this.scope.inputs.settingsName; 
     this.scope.inputsJSON = angular.toJson(this.scope.inputs);
+    this.scope.inputsURI = btoa ? encodeURIComponent(btoa(this.scope.inputsJSON)) : "ERROR_btoa_not_supported";
+    
     localStorage.setItem('ARCHISCOPE_scopeinputs', this.scope.inputsJSON);
+    
     var json = angular.toJson(this.scope.savedSettings);
     localStorage.setItem('ARCHISCOPE_savedSettings', json);
 };
@@ -295,7 +328,7 @@ Calculator.prototype.deleteSettings = function(name)
     this.save();
 };
 
-Calculator.prototype.calcModel = function()
+Calculator.prototype.calcModel = function()  // create the distance model; does not change when inputs are changed
 {
     this.scope.model = [];
     
@@ -347,7 +380,7 @@ Calculator.prototype.calcTable = function()
     var xs=[], ys=[];
     for(var i = 0; i < this.scope.model.length; i++)
     {
-        if(this.scope.model[i].reading > 0)
+        if(this.scope.model[i].reading > 0)  // COPY READING TO SETTINGS!
         {
             this.scope.inputs.settings[n] = {};
             this.scope.inputs.settings[n].distance = this.scope.model[i].distance;
@@ -371,8 +404,12 @@ Calculator.prototype.calcTable = function()
     this.cubicSpline = new CSPL();
     this.cubicSpline.getNaturalKs(xs, ys);
 
+    this.calcPolyfit();
+
     for(var i = 0; i < this.scope.model.length; i++)
     {
+        this.scope.model[i].polyfit = this.evalPolyfit(this.scope.model[i].distance);
+        
         //if(this.scope.model[i].distance < this.parallax) // must avoid paralax error!!
         //    continue;
             
@@ -383,8 +420,38 @@ Calculator.prototype.calcTable = function()
         if(i>0) // 2nd derivative of change
             this.scope.model[i].delta2nd= (this.scope.model[i].delta1m - this.scope.model[i-1].delta1m).toFixed(2);
     }
-    
+            
     this.calcSlope();
+};
+
+Calculator.prototype.calcPolyfit = function()
+{
+    var xMeters = [];
+    var yReadings = [];
+    
+    for(var j=0; j<this.scope.inputs.settings.length; j++)
+    {
+        if(this.scope.inputs.settings[j].distance < 20)
+            continue;
+            
+        xMeters.push(this.scope.inputs.settings[j].distance);
+        yReadings.push(this.scope.inputs.settings[j].reading);
+        console.log(this.scope.inputs.settings[j].distance + "," + this.scope.inputs.settings[j].reading);
+    }
+    
+    if(xMeters.length >= 2)
+        this.polynomial = polynomialCurveFitting(xMeters, yReadings);
+    else
+        this.polynomial = null;
+};
+
+Calculator.prototype.evalPolyfit = function(xMeters)
+{
+    if(xMeters < 18 || !this.polynomial)
+        return NaN;
+    // var xMeters = model.distance;
+    var r = this.polynomial[0][0] + this.polynomial[1][0] * xMeters + this.polynomial[2][0] * xMeters * xMeters;
+    return r.toFixed(2);
 };
 
 Calculator.prototype.calcSlope = function()
@@ -623,6 +690,10 @@ Calculator.prototype.transformScale = function()
         <th>Show drop</th>
         <td><input type="checkbox" ng-model="showDrop"></td>
       </tr>
+      <tr class="do-not-print">
+        <th>Show Polyfit</th>
+        <td><input type="checkbox" ng-model="showPolyfit"></td>
+      </tr>
       <!-- tr>
         <th>Inclinations</th>
         <td><input type="checkbox" ng-model="inputs.showInclination"></td>
@@ -642,6 +713,7 @@ Calculator.prototype.transformScale = function()
       <table id="table">
       <tr>
         <th colspan=2><input type="text" ng-model="inputs.settingsName" style="width:112px"></th>
+        <th ng-show="showPolyfit">Fit</td>
         <th> m </th>
         <th> &delta;/m </th>
         <!-- th>10&deg; m</th>
@@ -657,6 +729,7 @@ Calculator.prototype.transformScale = function()
       <tr ng-repeat="i in model" ng-class="{paralax: i.distance<calculator.parallax, tenmeters: i.distance % 10 == 0, twometers: i.distance % 2 == 0 && i.distance % 10 != 0 && i.distance>9}" >
         <td><input type="number" ng-model="i.reading"  style="width:45px"></td>
         <td>{{ i.interpolated }} </td>
+        <td ng-show="showPolyfit" ng-style="i.reading && i.reading < i.polyfit-0.05 ? {'background-color':'#AAF'} : i.reading && i.reading > i.polyfit+0.05 ? {'background-color':'#FAA'} : {'background-color':'#FFF'}" >{{i.polyfit}}</td>
         <td><button style="width:100%" ng-click="calculator.setExpandedModelDistance(i.distance); calculator.calcModel()">{{i.distance}}m</button></td>
         <td ng-style="i.delta2nd<0 && i.distance>20 ? {'background-color':'#F00'} : {}">{{ i.delta1m }}</td>
         <!-- td style="background-color:#F5FAFF">{{ i.down10}}</td>
