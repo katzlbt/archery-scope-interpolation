@@ -414,6 +414,8 @@ Calculator.prototype.calcTable = function()
         this.cubicSpline.getNaturalKs(xs, ys);
         this.calcPolyfit();
     }
+    else
+        this.cubicSpline = null;
     
     
     if(x0n >= 3) // more than 3 values < this.parallax
@@ -421,6 +423,8 @@ Calculator.prototype.calcTable = function()
         this.cubicSplineBunnyshot = new CSPL();
         this.cubicSplineBunnyshot.getNaturalKs(xs0, ys0);
     }
+    else
+        this.cubicSplineBunnyshot = null;
     
     for(var i = 0; i < this.scope.model.length; i++)
     {
