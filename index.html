@@ -14,13 +14,16 @@
     table { margin:auto; font-family:monospace; border-width:1px; border-collapse: collapse; border-style: solid; }
     td, th { min-width:50px; border-width:1px; border-style: solid; text-align:center; }
     .tdcontrols { height:36px }
-    .paralax { background-color: #CCC; }
-    .paralax-wrong { text-decoration: line-through; }
+    .parallax { background-color: #CCC; }
+    .parallax-wrong { text-decoration: line-through; }
     .tenmeters { background-color: #FCC; font-weight: bold }
     .twometers { background-color: #FFC; }
     .storage-warning { max-width:260px; font-family:Helvetica; font-size:0.7rem; }
     .helptext-td { max-width:360px; font-family:Helvetica; font-size:0.7rem; text-align: left; }
-        
+    
+    .polyfit-color-high { background-color:#FF5E23 }
+    .polyfit-color-low { background-color:#237BFF }
+    
     @media print 
     { 
         table { page-break-after:always; }
@@ -192,7 +195,10 @@ function Calculator($rootScope)
     
     this.maxTable = 90;
     
-    this.parallax = 11; // meters
+    this.parallax = 16; // meters
+    
+    this.cubicSpline = null; // interpolator for 16+ meters
+    this.cubicSplineBunnyshot = null; // interpolator for few meters
     
     this.scope.$watch("inputs.maxDistance", function(){ me.calcModel(); });
     this.scope.$watch("model", function(){ me.calcTable(); }, true);
@@ -328,7 +334,7 @@ Calculator.prototype.deleteSettings = function(name)
     this.save();
 };
 
-Calculator.prototype.calcModel = function()  // create the distance model; does not change when inputs are changed
+Calculator.prototype.calcModel = function()  // create the distance model; does not change when inputs are changed, see calcTable()
 {
     this.scope.model = [];
     
@@ -367,17 +373,12 @@ Calculator.prototype.calcModel = function()  // create the distance model; does 
 
 Calculator.prototype.calcTable = function()
 {
-    // this.g
-    // this.velocity
-    // this.distance[this.maxTable]
-    // y0 = 0 the initial height of the projectile
-    // ? = this.theta[]
-        
-    var n = 0, xn = 0;
+    var n = 0;
     
     this.scope.inputs.settings = []; // clear saved data
     
-    var xs=[], ys=[];
+    var xs0=[], ys0=[], x0n = 0;  // cubic spline
+    var xs=[], ys=[], xn = 0;  // cubic spline
     for(var i = 0; i < this.scope.model.length; i++)
     {
         if(this.scope.model[i].reading > 0)  // COPY READING TO SETTINGS!
@@ -387,12 +388,18 @@ Calculator.prototype.calcTable = function()
             this.scope.inputs.settings[n].reading = this.scope.model[i].reading;
             n++;
             
-            //if(this.scope.model[i].distance < this.parallax) // must avoid paralax error!!
-            //    continue;
-            
-            xs[xn] = this.scope.model[i].distance;
-            ys[xn] = this.scope.model[i].reading;
-            xn++;
+            if(this.scope.model[i].distance < this.parallax) // must avoid paralax error!!
+            {
+                xs0[x0n] = this.scope.model[i].distance;
+                ys0[x0n] = this.scope.model[i].reading;
+                x0n++;
+            }
+            else
+            {
+                xs[xn] = this.scope.model[i].distance;
+                ys[xn] = this.scope.model[i].reading;
+                xn++;
+            }
         }
     }
     
@@ -401,28 +408,50 @@ Calculator.prototype.calcTable = function()
     if(n < 3)
         return;
     
-    this.cubicSpline = new CSPL();
-    this.cubicSpline.getNaturalKs(xs, ys);
-
-    this.calcPolyfit();
-
+    if(xn >= 3) // more than 3 values > this.parallax
+    {
+        this.cubicSpline = new CSPL();
+        this.cubicSpline.getNaturalKs(xs, ys);
+        this.calcPolyfit();
+    }
+    
+    
+    if(x0n >= 3) // more than 3 values < this.parallax
+    {
+        this.cubicSplineBunnyshot = new CSPL();
+        this.cubicSplineBunnyshot.getNaturalKs(xs0, ys0);
+    }
+    
     for(var i = 0; i < this.scope.model.length; i++)
     {
         this.scope.model[i].polyfit = this.evalPolyfit(this.scope.model[i].distance);
         
-        //if(this.scope.model[i].distance < this.parallax) // must avoid paralax error!!
-        //    continue;
-            
-        var y = this.cubicSpline.evalSpline(this.scope.model[i].distance);
-        this.scope.model[i].interpolated = y.toFixed(2);
-        var y2 = this.cubicSpline.evalSpline(this.scope.model[i].distance+1);
-        this.scope.model[i].delta1m = (y2-y).toFixed(2);
+        var y = this.evalSpline(this.scope.model[i].distance);
+        this.scope.model[i].interpolated = y.toFixed(2); // WARNING this is a String!
+        var y2 = this.evalSpline(this.scope.model[i].distance+1);
+        this.scope.model[i].delta1m = (y2-y).toFixed(2); // WARNING this is a String!
         if(i>0) // 2nd derivative of change
-            this.scope.model[i].delta2nd= (this.scope.model[i].delta1m - this.scope.model[i-1].delta1m).toFixed(2);
+            this.scope.model[i].delta2nd= (this.scope.model[i].delta1m - this.scope.model[i-1].delta1m).toFixed(2); // WARNING this is a String!
     }
             
     this.calcSlope();
 };
+
+Calculator.prototype.evalSpline = function(distance) // handle parallax
+{
+    if(distance < this.parallax)
+    {
+        if(this.cubicSplineBunnyshot)
+            return this.cubicSplineBunnyshot.evalSpline(distance);
+        
+        return 0;
+    }
+    
+    if(this.cubicSpline)
+        return this.cubicSpline.evalSpline(distance);
+        
+    return 0;
+}
 
 Calculator.prototype.calcPolyfit = function()
 {
@@ -451,7 +480,7 @@ Calculator.prototype.evalPolyfit = function(xMeters)
         return NaN;
     // var xMeters = model.distance;
     var r = this.polynomial[0][0] + this.polynomial[1][0] * xMeters + this.polynomial[2][0] * xMeters * xMeters;
-    return r.toFixed(2);
+    return Math.round(r*100)/100;
 };
 
 Calculator.prototype.calcSlope = function()
@@ -486,15 +515,14 @@ Calculator.prototype.calcSvgModel = function()
         
     this.svgModel = [];
     
-    var spline = this.cubicSpline;
     var calcOneAngle = function(a, model)
     {
         var minReading = 999;
-        for(var d=70; d>=10; d-=2) // paralax error prohibits plotting 5m values
+        for(var d=70; d>=10; d-=2) // parallax error prohibits plotting 5m values
         {
             var p = { distance:d , reading:0, angle:a };
             var realD = p.distance * Math.cos(a * d2r);
-            p.reading = spline.evalSpline(realD);
+            p.reading = this.evalSpline(realD);
             
             minReading = Math.min(minReading, p.reading);
             //console.log(a, p.reading, minReading);
@@ -613,6 +641,7 @@ Calculator.prototype.drawSvgShot = function(drawWhat)
     var step=.5;
     var distDropGraph = []; // [[x1,y1], ...]
     var distScopeGraph = []; // [[x1,y1], ...]
+    var distScopePolyfit = []; // [[x1,y1], ...]
     for(var d = 0; d < max; d+=step) // d is the distance to the target           
     {
         if(typeof(this.scope.inputs.maxDistance) == "number" && d > max)
@@ -624,8 +653,12 @@ Calculator.prototype.drawSvgShot = function(drawWhat)
         distDropGraph.push(tuple);
         //console.log(tuple);
         
-        var scope = this.cubicSpline.evalSpline(d);
-        distScopeGraph.push([d, scope]);        
+        var scope = this.evalSpline(d);
+        distScopeGraph.push([d, scope]);
+        
+        scope = this.evalPolyfit(d);
+        if(scope > 0)
+            distScopePolyfit.push([d, scope]);
     }                        
 
     if(!this.shotSvg)
@@ -644,7 +677,10 @@ Calculator.prototype.drawSvgShot = function(drawWhat)
     if(drawWhat==1)
         group.polyline(distDropGraph).stroke({ width: 0.2 });
     else
+    {
         group.polyline(distScopeGraph).stroke({ width: 0.2 });    
+        group.polyline(distScopePolyfit).stroke({ width: 0.1, color:"#F00" });
+    }
 };
 
 Calculator.prototype.transformScale = function()
@@ -659,6 +695,11 @@ Calculator.prototype.transformScale = function()
     this.transformScaleFrom = "";
     this.transformScaleTo = "";
     this.calcModel();    
+};
+
+
+Calculator.prototype.debugIt = function(i)
+{
 };
 
 </script>
@@ -726,10 +767,10 @@ Calculator.prototype.transformScale = function()
         <th ng-show="showDrop">drop cm</th>
         <th ng-show="showDrop">cm/rev</th>
       </tr> 
-      <tr ng-repeat="i in model" ng-class="{paralax: i.distance<calculator.parallax, tenmeters: i.distance % 10 == 0, twometers: i.distance % 2 == 0 && i.distance % 10 != 0 && i.distance>9}" >
-        <td><input type="number" ng-model="i.reading"  style="width:45px"></td>
+      <tr ng-repeat="i in model" ng-class="{parallax: i.distance<calculator.parallax, tenmeters: i.distance % 10 == 0, twometers: i.distance % 2 == 0 && i.distance % 10 != 0 && i.distance>=calculator.parallax}" >
+        <td><input type="number" ng-model="i.reading" step="0.05" style="width:45px"></td>
         <td>{{ i.interpolated }} </td>
-        <td ng-show="showPolyfit" ng-style="i.reading && i.reading < i.polyfit-0.05 ? {'background-color':'#AAF'} : i.reading && i.reading > i.polyfit+0.05 ? {'background-color':'#FAA'} : {'background-color':'#FFF'}" >{{i.polyfit}}</td>
+        <td ng-show="showPolyfit" ng-class="{'polyfit-color-high': i.reading > i.polyfit+0.05, 'polyfit-color-low': i.reading && i.reading < i.polyfit-0.05 }" >{{i.polyfit}}</td>
         <td><button style="width:100%" ng-click="calculator.setExpandedModelDistance(i.distance); calculator.calcModel()">{{i.distance}}m</button></td>
         <td ng-style="i.delta2nd<0 && i.distance>20 ? {'background-color':'#F00'} : {}">{{ i.delta1m }}</td>
         <!-- td style="background-color:#F5FAFF">{{ i.down10}}</td>
@@ -798,10 +839,16 @@ Calculator.prototype.transformScale = function()
   </tr>
   <tr ng-show="showHelp">
       <td class="helptext-td">
-          <p>Enter 3 readings to start: 18m, 30m, 60m. If you need parallax readings for 3D, shoot every distance 12m down to 4m (in this order!). 
-      You can enter yard-readings even if it says meters, just dont mix y and m.
-      In the parallax-region optical parallax-error, which is function of the straight-line distance to target, outweights the 
-      arrow-drop, so fill in these readings manually. Drop does not consider drag.</p>
+          <p>Enter 3 readings to start: 20m, 30m, 50m. If you have more than 3 values you can use "Show Polyfit" to find 
+          bad readings (outliers) that are to high (orange) or low (blue). This will do a 2nd order polynomial fit from 20m to max.
+          You can enter yard-readings even if it says meters, just do not mix y and m. Drop does not consider drag.
+          </p>
+          <p>If you need parallax readings for 3D, shoot at least 3 distances between 15 and 4m. 
+          In the parallax-region optical parallax-error, which is function of the straight-line distance to target, outweights the 
+          arrow-drop, so fill in these readings carefully. A separate interpolation will deal with the values.
+          There is no way to find correct values for e.g. 60 degree uphill/downhill shots at 10m straight line distance, 
+          which is 5m arrow-drop distance and 10m parallax distance. A table cannot capture that.
+          </p>
       <p>Browser vendors decided to make local storage different between HTTP and HTTPS (secure) versions of the page!
       Google announced to disable local storage on insecure origins (non HTTPS). This is very stupid in our case.</p>
       <p>Howto bookmark: (1) open/click the link "Bookmark" above to open in default webbrowser, (2) create bookmark on phone or desktop, (3) repeat after changes!</p>
