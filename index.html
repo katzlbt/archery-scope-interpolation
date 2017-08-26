@@ -327,18 +327,44 @@ Calculator.prototype.load = function()
 {
     var ls = localStorage.getItem('ARCHISCOPE_savedSettings');
     if(ls)
-        this.scope.savedSettings = angular.fromJson(ls);
+    {
+        try
+        {
+            this.scope.savedSettings = angular.fromJson(ls);
+        }
+        catch(e) 
+        {
+            console.log("ARCHISCOPE_savedSettings JSON PARSE ERROR");
+        }
+    }
 
     ls = localStorage.getItem('ARCHISCOPE_parcour');
     if(ls)
-        this.scope.parcour = angular.fromJson(ls);
-
+    {
+        try
+        {
+            this.scope.parcour = angular.fromJson(ls);
+        }
+        catch(e) 
+        {
+            this.scope.parcour = ["Empty Parcour"];
+            console.log("ARCHISCOPE_parcour JSON PARSE ERROR");
+        }
+    }
+    
     var inp = localStorage.getItem('ARCHISCOPE_scopeinputs');
     if(inp)
     {
-        this.scope.inputsJSON = inp;
-        this.scope.inputs = angular.fromJson(inp);
-        this.scope._dataParamHash = calculateIntegerHashFromString(inp); // json this.scope.inputsJSON 
+        try
+        {
+            this.scope.inputs = angular.fromJson(inp);
+            this.scope.inputsJSON = inp;
+            this.scope._dataParamHash = calculateIntegerHashFromString(inp); // json this.scope.inputsJSON 
+        }
+        catch(e) 
+        {
+            console.log("ARCHISCOPE_scopeinputs JSON PARSE ERROR");
+        }        
     }
     
     var data = this.getUrlParameter();  // return json as string
@@ -368,7 +394,7 @@ Calculator.prototype.save = function()
     var json = angular.toJson(this.scope.savedSettings);
     localStorage.setItem('ARCHISCOPE_savedSettings', json);
     
-    var json = angular.toJson(this.scope.parcour);
+    json = angular.toJson(this.scope.parcour);
     localStorage.setItem('ARCHISCOPE_parcour', json);
 };
 
