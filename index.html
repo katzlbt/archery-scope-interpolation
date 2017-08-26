@@ -166,8 +166,8 @@
         var dotInv = numeric.inv(dot1);
         var dot2 = numeric.dot(xMatrixT,yMatrix);
         var solution = numeric.dot(dotInv,dot2);
-        console.log("Coefficients a + bx^1 + cx^2...");
-        console.log(solution);
+        //console.log("Coefficients a + bx^1 + cx^2...");
+        //console.log(solution);
         return solution;
     };
 	
@@ -175,6 +175,9 @@ function Calculator($rootScope)
 {
     this.scope = $rootScope;
     DEBUG_SCOPE = $rootScope;
+    
+    this.scope
+    
     
     this.scope.inputs = { 
         arrow:{ grains:400, name:"Arrow One" },
@@ -185,6 +188,9 @@ function Calculator($rootScope)
         };
     
     this.scope.savedSettings = {};
+    
+    this.parcour = // Array of target objects { id:"1 Adler", d:10.5, a:-25 }, ...
+        ["WBSC Rot", { id:"1 Dachs", d:23, a:-11 }, { id:"2 Fuchs", d:24, a:-16 }]; 
     
     var me = this;
     
@@ -205,7 +211,9 @@ function Calculator($rootScope)
     
     this.load();
     
-    this.scope.$watch("inputsJSON", function(){ me.scope.inputsURI = btoa ? encodeURIComponent(btoa(me.scope.inputsJSON)) : "ERROR_btoa_not_supported"; }, true);
+    this.scope.$watch("inputsJSON", function() {
+        me.scope.inputsURI = btoa ? encodeURIComponent(btoa(me.scope.inputsJSON)) : "ERROR_btoa_not_supported";
+        me.updateUrlParameter(); }, true);
     
     this.scope.$watch("inputs.v0fps", function(){ me.scope.inputs.v0 = Math.round(me.scope.inputs.v0fps * 0.3048); me.calcTable(); });
     
@@ -234,12 +242,86 @@ Calculator.prototype.setExpandedModelDistance = function(d)
         this.expandedModelDistance = d;
 }
 
-function getParameterByName(name) {
+function getParameterByName(name) { // GET parameter ?data=
     name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
     var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
         results = regex.exec(location.search);
     return results == null ? "" : results[1];
 }
+
+function getHashbangParameter(parameterName,defaultValue)
+    { 
+        if(parameterName instanceof Array)
+        {
+            for(var i in parameterName)
+            {
+                var ret = this.getHashbangParameter(parameterName[i], null);
+                if(ret !== null)
+                    return ret;
+            }
+            
+            return defaultValue;
+        }
+        
+        defaultValue = defaultValue || null;
+        if( !parameterName )
+            throw new Error("getHashbangParameter: 'parameterName' is missing!");
+
+        // parameter schema: "/paramName/:paramValue/" 
+        var regex = new RegExp("/"+parameterName+"/([^/#&]+)"); // [A-Za-z0-9_%]
+        var match = window.location.href.match(regex);
+        return match ? match[1] : defaultValue;
+    };
+
+function calculateIntegerHashFromString(s)
+    {
+        return s.split("").reduce(function(a,b){a=((a<<5)-a)+b.charCodeAt(0);return a&a},0);              
+    }
+        
+
+Calculator.prototype.getUrlParameter = function() // return json as string
+{
+    var data = null;
+    // 1. check the hashbang parameter #!/scope/{encodedData}
+    data = getHashbangParameter("sight",null);
+    
+    // 2. else check the GET ?data= parameter for backwards compatibility
+    if(!data)  // we have the GET parameter ?data=
+        data = getParameterByName("data");
+        
+    if(!data)
+        return null;
+        
+    // 3. decode the data
+    data = decodeURIComponent(data);
+    
+    try
+    {
+        data = atob(data);
+    }
+    catch(e) 
+    {
+        alert("Passed scope readings cannot be decoded! The data is invalid.");
+        return null;
+    }
+    
+    return data; // return json as string
+};
+
+Calculator.prototype.updateUrlParameter = function() // renew the hashbang parameter
+{
+    document.title = this.scope.inputs.settingsName; 
+    this.scope.inputsURI = btoa ? encodeURIComponent(btoa(this.scope.inputsJSON)) : "ERROR_btoa_not_supported";
+    
+    this.scope._dataParamHash = calculateIntegerHashFromString(this.scope.inputsJSON); // json string of this.scope.inputsJSON
+    
+    if(getParameterByName("data")) // strip the old get parameter
+        window.history.replaceState(null, null, window.location.pathname);
+
+    window.location.hash = "!/sight/" + this.scope.inputsURI;
+
+    console.log("SET #!")
+};
 
 Calculator.prototype.load = function()
 {
@@ -247,36 +329,25 @@ Calculator.prototype.load = function()
     if(ls)
         this.scope.savedSettings = angular.fromJson(ls);
 
+    ls = localStorage.getItem('ARCHISCOPE_parcour');
+    if(ls)
+        this.scope.parcour = angular.fromJson(ls);
+
     var inp = localStorage.getItem('ARCHISCOPE_scopeinputs');
     if(inp)
     {
         this.scope.inputsJSON = inp;
         this.scope.inputs = angular.fromJson(inp);
+        this.scope._dataParamHash = calculateIntegerHashFromString(inp); // json this.scope.inputsJSON 
     }
     
-    var data = getParameterByName("data");
-    if(data)
+    var data = this.getUrlParameter();  // return json as string
+    if(data)  // we have the GET parameter ?data=
     {
-        var calcIntHash = function(s){
-          return s.split("").reduce(function(a,b){a=((a<<5)-a)+b.charCodeAt(0);return a&a},0);              
-        }
-        
         // avoid confirm on every opening of page, only if data= is new
-        var hash = calcIntHash(data);
+        var hash = calculateIntegerHashFromString(data);
         if(hash != this.scope._dataParamHash)
         {
-            data = decodeURIComponent(data);
-            
-            try
-            {
-                data = atob(data);
-            }
-            catch(e) 
-            {
-                alert("Passed scope readings cannot be decoded! The data is invalid. " + e.name);
-                return;
-            }
-            
             if(confirm("Replace saved data from URL?") === true)
             {
                 this.scope.inputs = angular.fromJson(data);
@@ -289,14 +360,16 @@ Calculator.prototype.load = function()
 
 Calculator.prototype.save = function()
 {
-    document.title = this.scope.inputs.settingsName; 
     this.scope.inputsJSON = angular.toJson(this.scope.inputs);
-    this.scope.inputsURI = btoa ? encodeURIComponent(btoa(this.scope.inputsJSON)) : "ERROR_btoa_not_supported";
+    this.updateUrlParameter();
     
     localStorage.setItem('ARCHISCOPE_scopeinputs', this.scope.inputsJSON);
     
     var json = angular.toJson(this.scope.savedSettings);
     localStorage.setItem('ARCHISCOPE_savedSettings', json);
+    
+    var json = angular.toJson(this.scope.parcour);
+    localStorage.setItem('ARCHISCOPE_parcour', json);
 };
 
 Calculator.prototype.clear = function()
@@ -305,6 +378,7 @@ Calculator.prototype.clear = function()
     
     localStorage.removeItem('ARCHISCOPE_scopeinputs');
     localStorage.removeItem('ARCHISCOPE_savedSettings');
+    localStorage.removeItem('ARCHISCOPE_parcour');
     
     window.location.search="?reload=1";
 };
@@ -469,7 +543,7 @@ Calculator.prototype.calcPolyfit = function()
             
         xMeters.push(this.scope.inputs.settings[j].distance);
         yReadings.push(this.scope.inputs.settings[j].reading);
-        console.log(this.scope.inputs.settings[j].distance + "," + this.scope.inputs.settings[j].reading);
+        // console.log(this.scope.inputs.settings[j].distance + "," + this.scope.inputs.settings[j].reading);
     }
     
     if(xMeters.length >= 2)
