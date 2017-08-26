@@ -170,14 +170,95 @@
         //console.log(solution);
         return solution;
     };
-	
+
+function LocalStorageManager(localStorageId, scope, objectKey, dbKey, defaultId, defaultObject)
+{
+    // maintains localStorageId_current and localStorageId_DB
+    
+    this.localStorageId = localStorageId;
+    this.scope = scope;
+    this.objectKey = objectKey;
+    this.dbKey = dbKey;
+    
+    this.scope[this.objectKey] = {};
+    this.scope[this.objectKey]['key'] = defaultId;
+    this.scope[this.objectKey]['object'] = defaultObject;
+    this.scope[this.dbKey] = {};  // always { id1:object1, id2:object2, ... }
+    
+    this.load();
+    this.restore(null);
+}
+
+LocalStorageManager.prototype.save = function() // save the current Item temporarily in LS
+    {
+        localStorage.setItem(this.localStorageId + "_current", angular.toJson([this.scope[this.objectKey]['key'], this.scope[this.objectKey]['object']]));
+        //console.log("LS SAVE", this.scope[this.objectKey]['key']);
+    };
+
+LocalStorageManager.prototype.load = function(id) // load current item os startup
+    {
+        var current = this._getItemAndDecode(this.localStorageId + "_current",[null, null]);
+        
+        if(current[0])
+        {
+            this.scope[this.objectKey]['key'] = current[0];
+            this.scope[this.objectKey]['object'] = current[1];
+        }
+    };
+
+LocalStorageManager.prototype.store = function() // save the current Item in LS DB
+    {
+        this.scope[this.dbKey] = this._getItemAndDecode(this.localStorageId + "_DB", {});
+        this.scope[this.dbKey][this.scope[this.objectKey]['key']] = this.scope[this.objectKey]['object'];
+        localStorage.setItem(this.localStorageId + "_DB", angular.toJson(this.scope[this.dbKey]));
+    };
+
+LocalStorageManager.prototype.delete = function(idKey) // save the current Item in LS DB
+    {
+        this.scope[this.dbKey] = this._getItemAndDecode(this.localStorageId + "_DB", {});
+        delete this.scope[this.dbKey][idKey];
+        localStorage.setItem(this.localStorageId + "_DB", angular.toJson(this.scope[this.dbKey]));
+    };
+
+LocalStorageManager.prototype.restore = function(idOrNull) // save the current Item in LS DB
+    {
+        this.scope[this.dbKey] = this._getItemAndDecode(this.localStorageId + "_DB");
+        
+        if(!idOrNull)
+            return;
+            
+        var obj = this.scope[this.dbKey][idOrNull];
+        if(obj)
+        {
+            this.scope[this.objectKey]['key'] = idOrNull;
+            this.scope[this.objectKey]['object'] = obj;
+        }
+    };
+
+LocalStorageManager.prototype._getItemAndDecode = function(id, _default) // save the current Item in LS DB
+    {
+        var ls = localStorage.getItem(id);
+        if(ls)
+        {
+            try
+            {
+                return angular.fromJson(ls);
+            }
+            catch(e) 
+            {
+                console.log("JSON PARSE ERROR");
+            }
+        }
+        
+        return _default;
+    };
+
 function Calculator($rootScope)
 {
     this.scope = $rootScope;
-    DEBUG_SCOPE = $rootScope;
+    DEBUG_SCOPE = $rootScope;    
     
-    this.scope
-    
+    this.scope.Math = window.Math; // we need Math in the template
     
     this.scope.inputs = { 
         arrow:{ grains:400, name:"Arrow One" },
@@ -188,11 +269,13 @@ function Calculator($rootScope)
         };
     
     this.scope.savedSettings = {};
-    
-    this.parcour = // Array of target objects { id:"1 Adler", d:10.5, a:-25 }, ...
-        ["WBSC Rot", { id:"1 Dachs", d:23, a:-11 }, { id:"2 Fuchs", d:24, a:-16 }]; 
-    
+
     var me = this;
+    
+    this.scope.parcour = null; // {key:, value:} Array of target objects { id:"1 Adler", d:10.5, a:-25 }, ...        
+    this.scope.parcourStore = null; // Array of target objects { id:"1 Adler", d:10.5, a:-25 }, ...        
+    this.localStorageParcour = new LocalStorageManager("ARCHISCOPE_parcour", this.scope, "parcour", "parcourStore", "WBSC Rot", [{ id:"1 Dachs", d:23, a:-11 }, { id:"2 Fuchs", d:24, a:-16 }]);
+    this.scope.$watch("parcour", function(id){ me.localStorageParcour.save(); }, true);
     
     //this.scope.$watch("inputs.arrow.weightAll", function(){ me.scope.inputs.arrow.grams = me.scope.inputs.arrow.weightAll/me.scope.inputs.arrow.count; });
     //this.scope.$watch("inputs.arrow.count", function(){ me.scope.inputs.arrow.grams = me.scope.inputs.arrow.weightAll/me.scope.inputs.arrow.count; });
@@ -338,19 +421,7 @@ Calculator.prototype.load = function()
         }
     }
 
-    ls = localStorage.getItem('ARCHISCOPE_parcour');
-    if(ls)
-    {
-        try
-        {
-            this.scope.parcour = angular.fromJson(ls);
-        }
-        catch(e) 
-        {
-            this.scope.parcour = ["Empty Parcour"];
-            console.log("ARCHISCOPE_parcour JSON PARSE ERROR");
-        }
-    }
+    this.localStorageParcour.load();
     
     var inp = localStorage.getItem('ARCHISCOPE_scopeinputs');
     if(inp)
@@ -384,7 +455,7 @@ Calculator.prototype.load = function()
     }    
 };
 
-Calculator.prototype.save = function()
+Calculator.prototype.save = function() // this is the instant save function
 {
     this.scope.inputsJSON = angular.toJson(this.scope.inputs);
     this.updateUrlParameter();
@@ -394,8 +465,7 @@ Calculator.prototype.save = function()
     var json = angular.toJson(this.scope.savedSettings);
     localStorage.setItem('ARCHISCOPE_savedSettings', json);
     
-    json = angular.toJson(this.scope.parcour);
-    localStorage.setItem('ARCHISCOPE_parcour', json);
+    this.localStorageParcour.save();
 };
 
 Calculator.prototype.clear = function()
@@ -802,8 +872,27 @@ Calculator.prototype.transformScale = function()
 };
 
 
-Calculator.prototype.debugIt = function(i)
+Calculator.prototype.addRemoveTarget = function(i)
 {
+    if("" == this.scope.parcour.object[i].id)
+        this.scope.parcour.object.splice(i,1);
+    else
+        this.scope.parcour.object.splice(i+1,0,{id:"",d:0,a:0});
+};
+
+Calculator.prototype.storeParcour = function() // store many parcours and retrieve them
+{
+    this.localStorageParcour.store();
+};
+
+Calculator.prototype.restoreParcour = function(key) // store many parcours and retrieve them
+{
+    this.localStorageParcour.restore(key);
+};
+
+Calculator.prototype.deleteParcour = function(key) // store many parcours and retrieve them
+{
+    this.localStorageParcour.delete(key);
 };
 
 </script>
@@ -901,6 +990,40 @@ Calculator.prototype.debugIt = function(i)
       </table>
       
       
+      <br/>
+      <table>
+      <tr>
+        <th colspan="6"><input type="text" ng-model="parcour.key" style="width:200px; text-align:center;"></th>
+      </tr>
+      <tr>
+        <th>Target<!--button style="float:right" ng-click="calculator.addTarget(0)">+</button--></th>
+        <th>sight</th>
+        <th>distance</th>
+        <th>&deg;angle</th>
+        <th>LofS</th>
+      </tr>
+      <tr ng-repeat="target in parcour.object" >
+        <td><input type="text" ng-model="target.id" placeholder="1 Eagle" style="width:100px"><button ng-click="calculator.addRemoveTarget($index)">{{ target.id ? "+" : "-" }}</button></td>
+        <td>{{ calculator.evalSpline(target.d).toFixed(2) }}</td>
+        <td><input type="number" ng-model="target.d" placeholder="distance" style="width:50px"></td>
+        <td><input type="number" ng-model="target.a" placeholder="angle (+/-)" style="width:50px"></td>
+        <td>{{ (target.d * Math.cos(target.a * Math.PI/180.0)).toFixed(2) }}</td>
+      </tr>
+      <tr class="tdcontrols do-not-print">
+        <th>Save</th>
+        <td colspan="99"><button ng-click="calculator.storeParcour()">local save</button></td>
+      </tr>
+      <tr class="do-not-print">
+        <td colspan="6" class="storage-warning">iOS and Android may discard this local data occasionally! This data is currently not bookmarkable, make a screenshot!</td>
+      </tr>
+      <tr class="do-not-print" ng-repeat="(key, parcour) in parcourStore">
+        <td  colspan="3">{{ key }}</td>
+        <td><button ng-click="calculator.restoreParcour(key)">load</button></td>
+        <td><button ng-click="calculator.deleteParcour(key)">delete</button></td>
+      </tr>
+      </table>
+      <br/>
+
       
       <br/>
       <table class="do-not-print">
