@@ -28,9 +28,8 @@
     { 
         table { page-break-after:always; }
         tr    { page-break-inside:avoid; page-break-after:auto }
-        .do-not-print { display:none; }
-        textarea:focus, input:focus{ outline: none; }
         input, button { border-width:0px; border:none; }
+        .do-not-print { display:none; }
     }
     </style>
 <script>
@@ -40,6 +39,44 @@
       // this option might be handy for migrating old apps, but please don't use it in new ones!
       $controllerProvider.allowGlobals();
     }]);
+
+    function getParameterByName(name) { // GET parameter ?data=
+    name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+    var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+        results = regex.exec(location.search);
+    return results == null ? "" : results[1];
+}
+
+function getHashbangParameter(parameterName,defaultValue)
+    { 
+        if(parameterName instanceof Array)
+        {
+            for(var i in parameterName)
+            {
+                var ret = this.getHashbangParameter(parameterName[i], null);
+                if(ret !== null)
+                    return ret;
+            }
+            
+            return defaultValue;
+        }
+        
+        defaultValue = defaultValue || null;
+        if( !parameterName )
+            throw new Error("getHashbangParameter: 'parameterName' is missing!");
+
+        // parameter schema: "/paramName/:paramValue/" 
+        var regex = new RegExp("/"+parameterName+"/([^/#&]+)"); // [A-Za-z0-9_%]
+        var match = window.location.href.match(regex);
+        return match ? match[1] : defaultValue;
+    };
+
+function calculateIntegerHashFromString(s)
+    {
+        return s.split("").reduce(function(a,b){a=((a<<5)-a)+b.charCodeAt(0);return a&a},0);              
+    }
+        
+
 
     // http://blog.ivank.net/interpolation-with-cubic-splines.html
 	function CSPL()
@@ -191,21 +228,53 @@ function LocalStorageManager(localStorageId, scope, objectKey, dbKey, defaultId,
     this.restore(null);
 }
 
+LocalStorageManager.prototype._currentToJSON = function() // save the current Item temporarily in LS
+    {
+        return angular.toJson([this.scope[this.objectKey]['key'], this.scope[this.objectKey]['object']]);
+    }
+    
+LocalStorageManager.prototype._currentFromJSON = function(current) // save the current Item temporarily in LS
+    {
+        if(current[0])
+        {
+            this.scope[this.objectKey]['key'] = current[0];
+            this.scope[this.objectKey]['object'] = current[1];
+        }
+    };
+    
+LocalStorageManager.prototype.currentToURIComponent = function() // save the current Item temporarily in LS
+    {
+        return btoa ? encodeURIComponent(btoa(this._currentToJSON())) : "ERROR_btoa_not_supported";
+    };
+    
+LocalStorageManager.prototype.currentFromURIComponent = function(uric) // save the current Item temporarily in LS
+    {
+        var b64 = decodeURIComponent(uric);
+    
+        try
+        {
+            var json = atob(b64);
+            this._currentFromJSON(json);
+            return true;
+        }
+        catch(e) 
+        {
+            console.log("Cannot decode! The data is invalid.");
+        }
+        
+        return false;
+    };
+
 LocalStorageManager.prototype.save = function() // save the current Item temporarily in LS
     {
-        localStorage.setItem(this.localStorageId + "_current", angular.toJson([this.scope[this.objectKey]['key'], this.scope[this.objectKey]['object']]));
+        localStorage.setItem(this.localStorageId + "_current", this._currentToJSON());
         //console.log("LS SAVE", this.scope[this.objectKey]['key']);
     };
 
 LocalStorageManager.prototype.load = function(id) // load current item os startup
     {
         var current = this._getItemAndDecode(this.localStorageId + "_current",[null, null]);
-        
-        if(current[0])
-        {
-            this.scope[this.objectKey]['key'] = current[0];
-            this.scope[this.objectKey]['object'] = current[1];
-        }
+        this._currentFromJSON(current);
     };
 
 LocalStorageManager.prototype.store = function() // save the current Item in LS DB
@@ -327,43 +396,6 @@ Calculator.prototype.setExpandedModelDistance = function(d)
         this.expandedModelDistance = d;
 }
 
-function getParameterByName(name) { // GET parameter ?data=
-    name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
-    var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
-        results = regex.exec(location.search);
-    return results == null ? "" : results[1];
-}
-
-function getHashbangParameter(parameterName,defaultValue)
-    { 
-        if(parameterName instanceof Array)
-        {
-            for(var i in parameterName)
-            {
-                var ret = this.getHashbangParameter(parameterName[i], null);
-                if(ret !== null)
-                    return ret;
-            }
-            
-            return defaultValue;
-        }
-        
-        defaultValue = defaultValue || null;
-        if( !parameterName )
-            throw new Error("getHashbangParameter: 'parameterName' is missing!");
-
-        // parameter schema: "/paramName/:paramValue/" 
-        var regex = new RegExp("/"+parameterName+"/([^/#&]+)"); // [A-Za-z0-9_%]
-        var match = window.location.href.match(regex);
-        return match ? match[1] : defaultValue;
-    };
-
-function calculateIntegerHashFromString(s)
-    {
-        return s.split("").reduce(function(a,b){a=((a<<5)-a)+b.charCodeAt(0);return a&a},0);              
-    }
-        
-
 Calculator.prototype.getUrlParameter = function() // return json as string
 {
     var data = null;
@@ -403,9 +435,11 @@ Calculator.prototype.updateUrlParameter = function() // renew the hashbang param
     if(getParameterByName("data")) // strip the old get parameter
         window.history.replaceState(null, null, window.location.pathname);
 
-    window.location.hash = "!/sight/" + this.scope.inputsURI;
-
-    console.log("SET #!")
+    var s = "!/sight/" + this.scope.inputsURI;
+    var p = "/parcour/" + this.localStorageParcour.currentToURIComponent();
+    window.location.hash = s + p;
+    
+    console.log("SET #!", s.length, p.length)
 };
 
 Calculator.prototype.load = function()
@@ -422,9 +456,7 @@ Calculator.prototype.load = function()
             console.log("ARCHISCOPE_savedSettings JSON PARSE ERROR");
         }
     }
-
-    this.localStorageParcour.load();
-    
+        
     var inp = localStorage.getItem('ARCHISCOPE_scopeinputs');
     if(inp)
     {
@@ -454,7 +486,22 @@ Calculator.prototype.load = function()
                 this.save();
             }
         }
-    }    
+    }
+    
+    var parcour = getHashbangParameter("parcour", null);
+    if(parcour)
+    {
+        var hashURIC = calculateIntegerHashFromString(parcour);
+        var hashCurrent = calculateIntegerHashFromString(this.localStorageParcour.currentToURIComponent());
+        if(hashURIC != hashCurrent)
+        {
+            if(confirm("Replace parcour from URL?") === true)
+            {
+                this.localStorageParcour.currentFromURIComponent(parcour);
+                this.save();
+            }
+        }    
+    }
 };
 
 Calculator.prototype.save = function() // this is the instant save function
@@ -905,7 +952,8 @@ Calculator.prototype.restoreParcour = function(key) // store many parcours and r
 
 Calculator.prototype.deleteParcour = function(key) // store many parcours and retrieve them
 {
-    this.localStorageParcour.delete(key);
+    if(confirm("Delete " + key + "?") === true)
+        this.localStorageParcour.delete(key);
 };
 
 </script>
