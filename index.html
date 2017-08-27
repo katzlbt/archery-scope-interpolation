@@ -355,7 +355,7 @@ function Calculator($rootScope)
     this.scope.parcour = null; // {key:, value:} Array of target objects { id:"1 Adler", d:10.5, a:-25 }, ...        
     this.scope.parcourStore = null; // Array of target objects { id:"1 Adler", d:10.5, a:-25 }, ...        
     this.localStorageParcour = new LocalStorageManager("ARCHISCOPE_parcour", this.scope, "parcour", "parcourStore", "WBSC Rot", [{ id:"1 Dachs", d:23, a:-11 }, { id:"2 Fuchs", d:24, a:-16 }]);
-    this.scope.$watch("parcour", function(id){ me.localStorageParcour.save(); }, true);
+    this.scope.$watch("parcour", function(id){ me.localStorageParcour.save(); me.updateUrlParameter(); }, true);
     
     //this.scope.$watch("inputs.arrow.weightAll", function(){ me.scope.inputs.arrow.grams = me.scope.inputs.arrow.weightAll/me.scope.inputs.arrow.count; });
     //this.scope.$watch("inputs.arrow.count", function(){ me.scope.inputs.arrow.grams = me.scope.inputs.arrow.weightAll/me.scope.inputs.arrow.count; });
@@ -374,9 +374,7 @@ function Calculator($rootScope)
     
     this.load();
     
-    this.scope.$watch("inputsJSON", function() {
-        me.scope.inputsURI = btoa ? encodeURIComponent(btoa(me.scope.inputsJSON)) : "ERROR_btoa_not_supported";
-        me.updateUrlParameter(); }, true);
+    this.scope.$watch("inputsJSON", function() { me.updateUrlParameter(); });
     
     this.scope.$watch("inputs.v0fps", function(){ me.scope.inputs.v0 = Math.round(me.scope.inputs.v0fps * 0.3048); me.calcTable(); });
     
@@ -436,9 +434,6 @@ Calculator.prototype.getUrlParameter = function() // return json as string
 
 Calculator.prototype.updateUrlParameter = function() // renew the hashbang parameter
 {
-    if(isInWebAppiOS || isInWebAppChrome)
-        return;
-
     document.title = this.scope.inputs.settingsName; 
     this.scope.inputsURI = btoa ? encodeURIComponent(btoa(this.scope.inputsJSON)) : "ERROR_btoa_not_supported";
     
