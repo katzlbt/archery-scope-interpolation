@@ -28,7 +28,9 @@
     { 
         table { page-break-after:always; }
         tr    { page-break-inside:avoid; page-break-after:auto }
-        .do-not-print { display:none; } 
+        .do-not-print { display:none; }
+        textarea:focus, input:focus{ outline: none; }
+        input, button { border-width:0px; border:none; }
     }
     </style>
 <script>
@@ -1014,7 +1016,7 @@ Calculator.prototype.deleteParcour = function(key) // store many parcours and re
         <th>LofS</th>
       </tr>
       <tr ng-repeat="target in parcour.object" >
-        <td><input type="text" ng-model="target.id" placeholder="1 Eagle" style="width:65px"><button ng-click="calculator.addRemoveTarget($index)">{{ target.id ? "+" : "-" }}</button></td>
+        <td><input type="text" ng-model="target.id" placeholder="1 Eagle" style="width:65px"><button class="do-not-print" ng-click="calculator.addRemoveTarget($index)">{{ target.id ? "+" : "-" }}</button></td>
         <td>{{ calculator.evalSpline(target.d).toFixed(2) }}</td>
         <td><input type="number" ng-model="target.d" placeholder="distance" style="width:50px"></td>
         <td><input type="number" ng-model="target.a" placeholder="angle (+/-)" style="width:50px"></td>
