@@ -436,10 +436,10 @@ Calculator.prototype.updateUrlParameter = function() // renew the hashbang param
         window.history.replaceState(null, null, window.location.pathname);
 
     var s = "!/sight/" + this.scope.inputsURI;
-    var p = "/parcour/" + this.localStorageParcour.currentToURIComponent();
-    window.location.hash = s + p;
+    this.scope.parcourURI = "/parcour/" + this.localStorageParcour.currentToURIComponent();
+    window.location.hash = s + this.scope.parcourURI;
     
-    console.log("SET #!", s.length, p.length)
+    console.log("SET #!", s.length, this.scope.parcourURI.length)
 };
 
 Calculator.prototype.load = function()
@@ -948,6 +948,7 @@ Calculator.prototype.storeParcour = function() // store many parcours and retrie
 Calculator.prototype.restoreParcour = function(key) // store many parcours and retrieve them
 {
     this.localStorageParcour.restore(key);
+    this.updateUrlParameter();
 };
 
 Calculator.prototype.deleteParcour = function(key) // store many parcours and retrieve them
@@ -1043,7 +1044,7 @@ Calculator.prototype.deleteParcour = function(key) // store many parcours and re
       </tr>
       <tr class="tdcontrols do-not-print">
         <th>Bookmark</th>
-        <td colspan="99"><a href="index.html?data={{ inputsURI }}" target="_blank">{{ inputs.settingsName }}</a></td>
+        <td colspan="99"><a href="index.html#!/sight/{{ inputsURI }}" target="_blank">{{ inputs.settingsName }}</a></td>
       </tr>
       <tr class="do-not-print">
         <td colspan="6" class="storage-warning">iOS and Android may discard this local data occasionally! Make a bookmark or a screenshot.</td>
@@ -1075,7 +1076,11 @@ Calculator.prototype.deleteParcour = function(key) // store many parcours and re
         <td colspan="99"><button ng-click="calculator.storeParcour()">local save</button></td>
       </tr>
       <tr class="do-not-print">
-        <td colspan="6" class="storage-warning">iOS and Android may discard this local data occasionally! This data is currently not bookmarkable, make a screenshot!</td>
+        <td colspan="6" class="storage-warning">iOS and Android may discard this local data occasionally! Bookmark the current parcour or make a screenshot!</td>
+      </tr>
+      <tr class="tdcontrols do-not-print">
+        <th>Bookmark</th>
+        <td colspan="99"><a href="index.html#!{{ parcourURI }}" target="_blank">{{ parcour.key }}</a></td>
       </tr>
       <tr class="do-not-print" ng-repeat="(key, parcour) in parcourStore">
         <td  colspan="3">{{ key }}</td>
