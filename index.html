@@ -296,7 +296,7 @@ LocalStorageManager.prototype.delete = function(idKey) // save the current Item 
 
 LocalStorageManager.prototype.restore = function(idOrNull) // save the current Item in LS DB
     {
-        this.scope[this.dbKey] = this._getItemAndDecode(this.localStorageId + "_DB");
+        this.scope[this.dbKey] = this._getItemAndDecode(this.localStorageId + "_DB", {});
         
         if(!idOrNull)
             return;
@@ -311,7 +311,12 @@ LocalStorageManager.prototype.restore = function(idOrNull) // save the current I
 
 LocalStorageManager.prototype._getItemAndDecode = function(id, _default) // save the current Item in LS DB
     {
-        return this._fromJSONcatch(localStorage.getItem(id), _default);
+        var str = localStorage.getItem(id);
+        
+        if(!str)
+            return _default;
+            
+        return this._fromJSONcatch(str, _default);
     };
     
 LocalStorageManager.prototype._fromJSONcatch = function(jsonString, _default) // save the current Item in LS DB
