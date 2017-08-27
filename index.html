@@ -254,7 +254,7 @@ LocalStorageManager.prototype.currentFromURIComponent = function(uric) // save t
         try
         {
             var json = atob(b64);
-            this._currentFromJSON(json);
+            this._currentFromJSON(this._fromJSONcatch(json));
             return true;
         }
         catch(e) 
@@ -308,17 +308,18 @@ LocalStorageManager.prototype.restore = function(idOrNull) // save the current I
 
 LocalStorageManager.prototype._getItemAndDecode = function(id, _default) // save the current Item in LS DB
     {
-        var ls = localStorage.getItem(id);
-        if(ls)
+        return this._fromJSONcatch(localStorage.getItem(id), _default);
+    };
+    
+LocalStorageManager.prototype._fromJSONcatch = function(jsonString, _default) // save the current Item in LS DB
+    {
+        try
         {
-            try
-            {
-                return angular.fromJson(ls);
-            }
-            catch(e) 
-            {
-                console.log("JSON PARSE ERROR");
-            }
+            return angular.fromJson(jsonString);
+        }
+        catch(e) 
+        {
+            console.log("JSON PARSE ERROR");
         }
         
         return _default;
