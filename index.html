@@ -549,6 +549,11 @@ Calculator.prototype.calcTable = function()
     
     var xs0=[], ys0=[], x0n = 0;  // cubic spline
     var xs=[], ys=[], xn = 0;  // cubic spline
+    
+    xs0[x0n] = 0;
+    ys0[x0n] = 80;
+    x0n++;
+    
     for(var i = 0; i < this.scope.model.length; i++)
     {
         if(this.scope.model[i].reading > 0)  // COPY READING TO SETTINGS!
@@ -572,6 +577,7 @@ Calculator.prototype.calcTable = function()
             }
         }
     }
+        
     
     this.save();
     
@@ -590,6 +596,11 @@ Calculator.prototype.calcTable = function()
     
     if(x0n >= 3) // more than 3 values < this.parallax
     {
+        // Join the splines ...
+        xs0[x0n] = this.parallax;
+        ys0[x0n] = this.cubicSpline.evalSpline(this.parallax);;
+        x0n++;
+    
         this.cubicSplineBunnyshot = new CSPL();
         this.cubicSplineBunnyshot.getNaturalKs(xs0, ys0);
     }
@@ -998,12 +1009,12 @@ Calculator.prototype.deleteParcour = function(key) // store many parcours and re
       <tr>
         <th>Target<!--button style="float:right" ng-click="calculator.addTarget(0)">+</button--></th>
         <th>sight</th>
-        <th>distance</th>
+        <th>dist.</th>
         <th>&deg;angle</th>
         <th>LofS</th>
       </tr>
       <tr ng-repeat="target in parcour.object" >
-        <td><input type="text" ng-model="target.id" placeholder="1 Eagle" style="width:100px"><button ng-click="calculator.addRemoveTarget($index)">{{ target.id ? "+" : "-" }}</button></td>
+        <td><input type="text" ng-model="target.id" placeholder="1 Eagle" style="width:65px"><button ng-click="calculator.addRemoveTarget($index)">{{ target.id ? "+" : "-" }}</button></td>
         <td>{{ calculator.evalSpline(target.d).toFixed(2) }}</td>
         <td><input type="number" ng-model="target.d" placeholder="distance" style="width:50px"></td>
         <td><input type="number" ng-model="target.a" placeholder="angle (+/-)" style="width:50px"></td>
