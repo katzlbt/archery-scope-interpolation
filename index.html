@@ -1018,7 +1018,7 @@ Calculator.prototype.deleteParcour = function(key) // store many parcours and re
         <td>{{ calculator.evalSpline(target.d).toFixed(2) }}</td>
         <td><input type="number" ng-model="target.d" placeholder="distance" style="width:50px"></td>
         <td><input type="number" ng-model="target.a" placeholder="angle (+/-)" style="width:50px"></td>
-        <td>{{ (target.d * Math.cos(target.a * Math.PI/180.0)).toFixed(2) }}</td>
+        <td>{{ (target.d / Math.cos(target.a * Math.PI/180.0)).toFixed(2) }}</td>
       </tr>
       <tr class="tdcontrols do-not-print">
         <th>Save</th>
