@@ -47,6 +47,9 @@
     return results == null ? "" : results[1];
 }
 
+var isInWebAppiOS = (window.navigator.standalone == true);
+var isInWebAppChrome = (window.matchMedia('(display-mode: standalone)').matches);
+
 function getHashbangParameter(parameterName,defaultValue)
     { 
         if(parameterName instanceof Array)
@@ -428,6 +431,9 @@ Calculator.prototype.getUrlParameter = function() // return json as string
 
 Calculator.prototype.updateUrlParameter = function() // renew the hashbang parameter
 {
+    if(isInWebAppiOS || isInWebAppChrome)
+        return;
+
     document.title = this.scope.inputs.settingsName; 
     this.scope.inputsURI = btoa ? encodeURIComponent(btoa(this.scope.inputsJSON)) : "ERROR_btoa_not_supported";
     
@@ -472,7 +478,12 @@ Calculator.prototype.load = function()
             console.log("ARCHISCOPE_scopeinputs JSON PARSE ERROR");
         }        
     }
-    
+
+    if(isInWebAppiOS || isInWebAppChrome)
+        return;
+
+    // not reachable in standalone web app
+
     var data = this.getUrlParameter();  // return json as string
     if(data)  // we have the GET parameter ?data=
     {
@@ -503,6 +514,8 @@ Calculator.prototype.load = function()
             }
         }    
     }
+    
+    // not reachable in standalone web app
 };
 
 Calculator.prototype.save = function() // this is the instant save function
