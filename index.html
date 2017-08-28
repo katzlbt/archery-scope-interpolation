@@ -355,7 +355,6 @@ function Calculator($rootScope)
     this.scope.parcour = null; // {key:, value:} Array of target objects { id:"1 Adler", d:10.5, a:-25 }, ...        
     this.scope.parcourStore = null; // Array of target objects { id:"1 Adler", d:10.5, a:-25 }, ...        
     this.localStorageParcour = new LocalStorageManager("ARCHISCOPE_parcour", this.scope, "parcour", "parcourStore", "WBSC Rot", [{ id:"1 Dachs", d:23, a:-11 }, { id:"2 Fuchs", d:24, a:-16 }]);
-    this.scope.$watch("parcour", function(id){ me.localStorageParcour.save(); me.updateUrlParameter(); }, true);
     
     //this.scope.$watch("inputs.arrow.weightAll", function(){ me.scope.inputs.arrow.grams = me.scope.inputs.arrow.weightAll/me.scope.inputs.arrow.count; });
     //this.scope.$watch("inputs.arrow.count", function(){ me.scope.inputs.arrow.grams = me.scope.inputs.arrow.weightAll/me.scope.inputs.arrow.count; });
@@ -373,26 +372,36 @@ function Calculator($rootScope)
     this.scope.$watch("model", function(){ me.calcTable(); }, true);
     
     this.load();
-    
-    this.scope.$watch("inputsJSON", function() { me.updateUrlParameter(); });
-    
+    this._calculateUris();
+        
     this.scope.$watch("inputs.v0fps", function(){ me.scope.inputs.v0 = Math.round(me.scope.inputs.v0fps * 0.3048); me.calcTable(); });
     
     this.scope.clearLocalStorage = function() { me.clear(); };
     this.scope.saveSettings = function() { me.saveSettings(); };
     this.scope.loadSettings = function(x) { me.loadSettings(x); };
     this.scope.deleteSettings = function(x) { if(confirm('Delete?')) { me.deleteSettings(x); } };
-    
-    this.scope.$watch("inputs", function(){  
-        document.title = me.scope.inputs.settingsName; 
-        me.scope.inputsJSON = angular.toJson(me.scope.inputs); }, true);
-    
+        
     this.scope.showScaleAndSVG = false; // disables calcSvgModel()
     this.scope.inputs.svgScaleX = 1.0;
     this.scope.$watch("inputs.svgScaleX", function(){ me.calcSvgModel(); });
         
     this.scope.calculator = this;
+        
+    setTimeout(function(){ me.startWatches(); },1);
 }
+
+Calculator.prototype.startWatches = function()
+{
+    var me = this;
+    
+    this.scope.$watch("inputs", function(n,o){
+        console.log("inputs changed!", o, n);
+        document.title = me.scope.inputs.settingsName; 
+        me.scope.inputsJSON = angular.toJson(me.scope.inputs);
+        me.save(); }, true);
+        
+    this.scope.$watch("parcour", function(){ me.localStorageParcour.save(); me.updateUrlParameter("parcour"); }, true);
+};
 
 Calculator.prototype.setExpandedModelDistance = function(d)
 {
@@ -432,26 +441,34 @@ Calculator.prototype.getUrlParameter = function() // return json as string
     return data; // return json as string
 };
 
-Calculator.prototype.updateUrlParameter = function() // renew the hashbang parameter
+Calculator.prototype._calculateUris = function() // renew the hashbang parameter
 {
-    document.title = this.scope.inputs.settingsName; 
-    this.scope.inputsURI = btoa ? encodeURIComponent(btoa(this.scope.inputsJSON)) : "ERROR_btoa_not_supported";
-    
+    this.scope.inputsURI =  "/sight/" + (btoa ? encodeURIComponent(btoa(this.scope.inputsJSON)) : "ERROR_btoa_not_supported");    
     this.scope._dataParamHash = calculateIntegerHashFromString(this.scope.inputsJSON); // json string of this.scope.inputsJSON
     
     if(getParameterByName("data")) // strip the old get parameter
         window.history.replaceState(null, null, window.location.pathname);
 
-    var s = "!/sight/" + this.scope.inputsURI;
     this.scope.parcourURI = "/parcour/" + this.localStorageParcour.currentToURIComponent();
-    window.location.hash = s + this.scope.parcourURI;
+};
+
+Calculator.prototype.updateUrlParameter = function(source) // renew the hashbang parameter
+{
+    this._calculateUris();
     
-    console.log("SET #!", s.length, this.scope.parcourURI.length)
+    document.title = this.scope.inputs.settingsName; 
+    
+    if(getParameterByName("data")) // strip the old get parameter
+        window.history.replaceState(null, null, window.location.pathname);
+
+    window.location.hash = "!" + this.scope.inputsURI + this.scope.parcourURI;    
+
+    console.log("SET #!", this.scope.inputsURI.length, this.scope.parcourURI.length, source)
 };
 
 Calculator.prototype.load = function()
 {
-    var ls = localStorage.getItem('ARCHISCOPE_savedSettings');
+    var ls = localStorage.getItem('ARCHISCOPE_savedSettings'); // the database of arrows
     if(ls)
     {
         try
@@ -464,7 +481,7 @@ Calculator.prototype.load = function()
         }
     }
         
-    var inp = localStorage.getItem('ARCHISCOPE_scopeinputs');
+    var inp = localStorage.getItem('ARCHISCOPE_scopeinputs'); // the CURRNT arrow
     if(inp)
     {
         try
@@ -510,7 +527,7 @@ Calculator.prototype.load = function()
             if(confirm("Replace parcour from URL?") === true)
             {
                 this.localStorageParcour.currentFromURIComponent(parcour);
-                this.save();
+                this.localStorageParcour.save();
             }
         }    
     }
@@ -521,7 +538,7 @@ Calculator.prototype.load = function()
 Calculator.prototype.save = function() // this is the instant save function
 {
     this.scope.inputsJSON = angular.toJson(this.scope.inputs);
-    this.updateUrlParameter();
+    this.updateUrlParameter("save");
     
     localStorage.setItem('ARCHISCOPE_scopeinputs', this.scope.inputsJSON);
     
@@ -602,14 +619,13 @@ Calculator.prototype.calcModel = function()  // create the distance model; does 
                 this.scope.model[i].reading = this.scope.inputs.settings[j].reading; 
                 
         i++;
-    }                        
+    }
 };
 
-Calculator.prototype.calcTable = function()
+Calculator.prototype.calcTable = function() // copies distance/sight-reading to inputs
 {
-    var n = 0;
-    
-    this.scope.inputs.settings = []; // clear saved data
+    var settingsChanged = false, n = 0;
+    var newSettings = [];
     
     var xs0=[], ys0=[], x0n = 0;  // cubic spline
     var xs=[], ys=[], xn = 0;  // cubic spline
@@ -622,9 +638,14 @@ Calculator.prototype.calcTable = function()
     {
         if(this.scope.model[i].reading > 0)  // COPY READING TO SETTINGS!
         {
-            this.scope.inputs.settings[n] = {};
-            this.scope.inputs.settings[n].distance = this.scope.model[i].distance;
-            this.scope.inputs.settings[n].reading = this.scope.model[i].reading;
+            if(this.scope.inputs.settings[n] == undefined ||
+               this.scope.inputs.settings[n].distance != this.scope.model[i].distance || 
+               this.scope.inputs.settings[n].reading != this.scope.model[i].reading) // avoid firing $watch if no change took place
+            {
+                settingsChanged = true;
+            }
+            
+            newSettings.push({ distance:this.scope.model[i].distance, reading:this.scope.model[i].reading });
             n++;
             
             if(this.scope.model[i].distance < this.parallax) // must avoid paralax error!!
@@ -641,9 +662,11 @@ Calculator.prototype.calcTable = function()
             }
         }
     }
-        
-    
-    this.save();
+
+    if(settingsChanged || this.scope.inputs.settings.length != newSettings.length)
+    {
+        this.scope.inputs.settings = newSettings;
+    }
     
     if(n < 3)
         return;
@@ -661,10 +684,13 @@ Calculator.prototype.calcTable = function()
     if(x0n >= 3) // more than 3 values < this.parallax
     {
         // Join the splines ...
-        xs0[x0n] = this.parallax;
-        ys0[x0n] = this.cubicSpline.evalSpline(this.parallax);;
-        x0n++;
-    
+        if(this.cubicSpline)
+        {
+            xs0[x0n] = this.parallax;
+            ys0[x0n] = this.cubicSpline.evalSpline(this.parallax);;
+            x0n++;
+        }
+        
         this.cubicSplineBunnyshot = new CSPL();
         this.cubicSplineBunnyshot.getNaturalKs(xs0, ys0);
     }
@@ -1059,7 +1085,7 @@ Calculator.prototype.deleteParcour = function(key) // store many parcours and re
       </tr>
       <tr class="tdcontrols do-not-print">
         <th>Bookmark</th>
-        <td colspan="99"><a href="index.html#!/sight/{{ inputsURI }}" target="_blank">{{ inputs.settingsName }}</a></td>
+        <td colspan="99"><a href="index.html#!{{ inputsURI }}" target="_blank">{{ inputs.settingsName }}</a></td>
       </tr>
       <tr class="do-not-print">
         <td colspan="6" class="storage-warning">iOS and Android may discard this local data occasionally! Make a bookmark or a screenshot.</td>
