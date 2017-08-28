@@ -572,12 +572,13 @@ Calculator.prototype.calcModel = function()  // create the distance model; does 
     this.scope.model = [];
     
     var max = this.scope.inputs.maxDistance;
+    
     for(var j=0; j<this.scope.inputs.settings.length; j++) // do not discard user data
         if(this.scope.inputs.settings[j].distance > max)
             max = this.scope.inputs.settings[j].distance;
                     
     var i=0, step=1;
-    for(var d = 4; d < max; d+=step) // d is the distance to the target           
+    for(var d = 4; d <= max; d+=step) // d is the distance to the target           
     {
         if(d>=this.expandedModelDistance && d<this.expandedModelDistance+2)
             step = 0.25;
