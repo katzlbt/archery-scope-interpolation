@@ -1088,7 +1088,17 @@ Calculator.prototype.deleteParcour = function(key) // store many parcours and re
         <td colspan="99"><a href="index.html#!{{ inputsURI }}" target="_blank">{{ inputs.settingsName }}</a></td>
       </tr>
       <tr class="do-not-print">
-        <td colspan="6" class="storage-warning">iOS and Android may discard this local data occasionally! Make a bookmark or a screenshot.</td>
+        <td colspan="99" class="storage-warning">iOS and Android may discard this local data occasionally! Make a bookmark or a screenshot.</td>
+      </tr>
+      <tr class="do-not-print">
+        <th colspan="3">Saved reading</th>
+        <th colspan="99">Use</th>
+      </tr>
+      <tr class="do-not-print" ng-repeat="(key, value) in savedSettings">
+        <td colspan="3"><a href="" ng-click="showSavedReadingsExpanded=!showSavedReadingsExpanded">{{ key }}</a></td>
+        <td><button ng-click="loadSettings(key)">load</button></td>
+        <td ng-if="showSavedReadingsExpanded" ng-repeat="item in savedSettings[key]"> {{ item.distance }}m {{ item.reading }} </td>
+        <td ng-if="showSavedReadingsExpanded"><button ng-click="deleteSettings(key)">delete</button></td>
       </tr>
       </table>
       
@@ -1143,29 +1153,13 @@ Calculator.prototype.deleteParcour = function(key) // store many parcours and re
         <td><input type="number" ng-model="calculator.transformScaleTo" placeholder="23.1" style="width:50px"></td>
       </tr>
       <tr>
-        <td><button ng-click="calculator.transformScale()">shift scale</button></td>
+        <td colspan="99"><button ng-click="calculator.transformScale()">shift scale</button></td>
+      </tr>
+      <tr class="do-not-print">
+        <td colspan="99" class="storage-warning">Adds the change to all readings. Use if you have changed the nocking point or arrow rest, if the change at 10m, or 20m ist exactly the same as at 50m.</td>
       </tr>
       </table>
       <br/>
-            
-      
-      <table id="readings" class="do-not-print">
-      <tr>
-        <th>Saved reading</th>
-        <th>Use</th>
-      </tr>
-      <tr ng-repeat="(key, value) in savedSettings">
-        <td><a href="" ng-click="showSavedReadingsExpanded=!showSavedReadingsExpanded">{{ key }}</a></td>
-        <td><button ng-click="loadSettings(key)">load</button></td>
-        <td ng-if="showSavedReadingsExpanded" ng-repeat="item in savedSettings[key]"> {{ item.distance }}m {{ item.reading }} </td>
-        <td ng-if="showSavedReadingsExpanded"><button ng-click="deleteSettings(key)">delete</button></td>
-      </tr>
-      <tr>
-        <td colspan="6" class="storage-warning">iOS and Android may discard this local data occasionally! Make a bookmark or a screenshot.</td>
-      </tr>
-      </table>
-      <br/>
-      
       
   <table class="do-not-print">
   <tr>
