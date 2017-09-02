@@ -24,6 +24,9 @@
     .polyfit-color-high { background-color:#FF5E23 }
     .polyfit-color-low { background-color:#237BFF }
     
+    .parcour-tr:nth-child(even) { background-color:#DDDDDD }
+    .parcour-highlight-tr { background-color:#FFCC33 }
+    
     @media print 
     { 
         table { page-break-after:always; }
@@ -1061,7 +1064,7 @@ Calculator.prototype.deleteParcour = function(key) // store many parcours and re
         <th>50&deg; m</th -->
         <th ng-show="showDrop">time s</th>
         <th ng-show="showDrop">drop cm</th>
-        <th ng-show="showDrop">cm/rev</th>
+        <th ng-show="showDrop">?</th>
       </tr> 
       <tr ng-repeat="i in model" ng-class="{parallax: i.distance<calculator.parallax, tenmeters: i.distance % 10 == 0, twometers: i.distance % 2 == 0 && i.distance % 10 != 0 && i.distance>=calculator.parallax}" >
         <td><input type="number" ng-model="i.reading" step="0.05" style="width:45px"></td>
@@ -1115,16 +1118,20 @@ Calculator.prototype.deleteParcour = function(key) // store many parcours and re
         <th>&deg;angle</th>
         <th>LofS</th>
       </tr>
-      <tr ng-repeat="target in parcour.object" >
-        <td><input type="text" ng-model="target.id" placeholder="1 Eagle" style="width:75px"><button class="do-not-print" ng-click="calculator.addRemoveTarget($index)">{{ target.id ? "+" : "-" }}</button></td>
+      <tr ng-repeat="target in parcour.object" class="parcour-tr" ng-class="parcour-highlight-tr: highlightParcourRow == $index">
+        <td><input type="text" ng-model="target.id" placeholder="1 Eagle" style="width:75px"><button class="do-not-print" ng-show="showEditParcourButtons" ng-click="calculator.addRemoveTarget($index)">{{ target.id ? "+" : "-" }}</button>
+            </td>
         <td>{{ calculator.evalSpline(target.d).toFixed(2) }}</td>
         <td><input type="number" ng-model="target.d" placeholder="distance" style="width:50px"></td>
         <td><input type="number" ng-model="target.a" placeholder="angle (+/-)" style="width:40px"></td>
         <td>{{ (target.d / Math.cos(target.a * Math.PI/180.0)).toFixed(2) }}</td>
       </tr>
       <tr class="tdcontrols do-not-print">
-        <th>Save</th>
-        <td colspan="99"><button ng-click="calculator.storeParcour()">local save</button></td>
+        <th>Do</th>
+        <td colspan="99">
+            <button ng-click="showEditParcourButtons = !showEditParcourButtons">edit</button>
+            <button ng-click="calculator.storeParcour()">local save</button>
+        </td>
       </tr>
       <tr class="do-not-print">
         <td colspan="6" class="storage-warning">iOS and Android may discard this local data occasionally! Bookmark the current parcour or make a screenshot!</td>
