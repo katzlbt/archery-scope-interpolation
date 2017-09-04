@@ -24,11 +24,19 @@
     .polyfit-color-high { background-color:#FF5E23 }
     .polyfit-color-low { background-color:#237BFF }
     
-    .parcour-tr:nth-child(even) { background-color:#DDDDDD }
     .parcour-highlight-tr { background-color:#FFCC33 }
+
+    
+    /* disrupts jEdit syntax coloring */ 
+    @media screen
+    {
+        .parcour-tr:nth-child(even) { background-color:#DDDDDD }
+    }
     
     @media print 
     { 
+        .parcour-tr:nth-child(even) { background-color:#DDDDDD }
+        
         table { page-break-after:always; }
         tr    { page-break-inside:avoid; page-break-after:auto }
         input, button { border-width:0px; border:none; }
@@ -389,8 +397,10 @@ function Calculator($rootScope)
     this.scope.$watch("inputs.svgScaleX", function(){ me.calcSvgModel(); });
         
     this.scope.calculator = this;
+    
+    this.parcourHighlightRow = 0;
         
-    setTimeout(function(){ me.startWatches(); },1);
+    setTimeout(function(){ me.startWatches(); },1);    
 }
 
 Calculator.prototype.startWatches = function()
@@ -1001,6 +1011,19 @@ Calculator.prototype.deleteParcour = function(key) // store many parcours and re
         this.localStorageParcour.delete(key);
 };
 
+Calculator.prototype.setHighlightParcour = function(index) // store many parcours and retrieve them
+{
+    if(this.parcourHighlightRow == index)
+        index++;
+        
+    this.parcourHighlightRow = index;
+};
+
+Calculator.prototype.advanceHighlightParcour = function() // store many parcours and retrieve them
+{
+    this.parcourHighlightRow++;
+};
+
 </script>
 </head>
 <body>
@@ -1118,19 +1141,19 @@ Calculator.prototype.deleteParcour = function(key) // store many parcours and re
         <th>&deg;angle</th>
         <th>LofS</th>
       </tr>
-      <tr ng-repeat="target in parcour.object" class="parcour-tr" ng-class="parcour-highlight-tr: highlightParcourRow == $index">
+      <tr ng-repeat="target in parcour.object" ng-class="calculator.parcourHighlightRow == $index ? 'parcour-highlight-tr' : 'parcour-tr'">
         <td><input type="text" ng-model="target.id" placeholder="1 Eagle" style="width:75px"><button class="do-not-print" ng-show="showEditParcourButtons" ng-click="calculator.addRemoveTarget($index)">{{ target.id ? "+" : "-" }}</button>
             </td>
-        <td>{{ calculator.evalSpline(target.d).toFixed(2) }}</td>
+        <td ng-click="calculator.setHighlightParcour($index)">{{ calculator.evalSpline(target.d).toFixed(2) }}</td>
         <td><input type="number" ng-model="target.d" placeholder="distance" style="width:50px"></td>
         <td><input type="number" ng-model="target.a" placeholder="angle (+/-)" style="width:40px"></td>
-        <td>{{ (target.d / Math.cos(target.a * Math.PI/180.0)).toFixed(2) }}</td>
+        <td ng-click="calculator.advanceHighlightParcour($index)">{{ (target.d / Math.cos(target.a * Math.PI/180.0)).toFixed(2) }}</td>
       </tr>
       <tr class="tdcontrols do-not-print">
         <th>Do</th>
         <td colspan="99">
             <button ng-click="showEditParcourButtons = !showEditParcourButtons">edit</button>
-            <button ng-click="calculator.storeParcour()">local save</button>
+            <button ng-click="calculator.storeParcour()">local save</button>
         </td>
       </tr>
       <tr class="do-not-print">
@@ -1183,6 +1206,9 @@ Calculator.prototype.deleteParcour = function(key) // store many parcours and re
           arrow-drop, so fill in these readings carefully. A separate interpolation will deal with the values.
           There is no way to find correct values for e.g. 60 degree uphill/downhill shots at 10m straight line distance, 
           which is 5m arrow-drop distance and 10m parallax distance. A table cannot capture that.
+          </p>
+          <p>You can create and save parcours separately. To add a target, click "edit" and then the + button. To remove, clear the text and hit the - button.
+          Enter the shot distance and degree-angle to calculate the line-of-sight (LofS) and sight-setting. Advance the sight-highlighted row by tapping LofS or set it by tapping any row in the sight column.
           </p>
       <p>Browser vendors decided to make local storage different between HTTP and HTTPS (secure) versions of the page!
       Google announced to disable local storage on insecure origins (non HTTPS). This is very stupid in our case.</p>
