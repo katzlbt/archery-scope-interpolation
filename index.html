@@ -398,13 +398,20 @@ function Calculator($rootScope)
         
     this.scope.calculator = this;
     
-    this.parcourHighlightRow = 0;
+    var ls = localStorage.getItem('ARCHISCOPE_parcour_highlight');
+    this.parcourHighlightRow = ls ? parseInt(ls) : 0;  // see also startWatches!
         
     setTimeout(function(){ me.startWatches(); },1);    
 }
 
 Calculator.prototype.startWatches = function()
 {
+    if(this.parcourHighlightRow > 0)
+    {
+        var element = document.getElementById("parcourTable")
+        element.scrollIntoView(true);
+    }
+
     var me = this;
     
     this.scope.$watch("inputs", function(n,o){
@@ -568,6 +575,7 @@ Calculator.prototype.clear = function()
     localStorage.removeItem('ARCHISCOPE_scopeinputs');
     localStorage.removeItem('ARCHISCOPE_savedSettings');
     localStorage.removeItem('ARCHISCOPE_parcour');
+    localStorage.removeItem('ARCHISCOPE_parcour_highlight');
     
     window.location.search="?reload=1";
 };
@@ -1003,6 +1011,7 @@ Calculator.prototype.restoreParcour = function(key) // store many parcours and r
 {
     this.localStorageParcour.restore(key);
     this.updateUrlParameter();
+    this.parcourHighlightRow = 0;
 };
 
 Calculator.prototype.deleteParcour = function(key) // store many parcours and retrieve them
@@ -1017,11 +1026,13 @@ Calculator.prototype.setHighlightParcour = function(index) // store many parcour
         index++;
         
     this.parcourHighlightRow = index;
+    localStorage.setItem('ARCHISCOPE_parcour_highlight', this.parcourHighlightRow.toString());
 };
 
 Calculator.prototype.advanceHighlightParcour = function() // store many parcours and retrieve them
 {
     this.parcourHighlightRow++;
+    localStorage.setItem('ARCHISCOPE_parcour_highlight', this.parcourHighlightRow.toString());
 };
 
 </script>
@@ -1130,7 +1141,7 @@ Calculator.prototype.advanceHighlightParcour = function() // store many parcours
       
       
       <br/>
-      <table>
+      <table id="parcourTable">
       <tr>
         <th colspan="6"><input type="text" ng-model="parcour.key" style="width:200px; text-align:center;"></th>
       </tr>
