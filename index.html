@@ -355,8 +355,8 @@ function Calculator($rootScope)
     this.scope.Math = window.Math; // we need Math in the template
     
     this.scope.inputs = { 
-        arrow:{ grains:400, name:"Arrow One" },
-        settings:[], // { distance:, reading: }
+        arrow:{ grains:400, name:"Arrow One", v0fps:245, v0:74 },
+        settings:[], // [{ distance:, reading: }, ...]
         v0fps:245,
         v0:74,
         maxDistance:60
@@ -387,7 +387,7 @@ function Calculator($rootScope)
     this.load();
     this._calculateUris();
         
-    this.scope.$watch("inputs.v0fps", function(){ me.scope.inputs.v0 = Math.round(me.scope.inputs.v0fps * 0.3048); me.calcTable(); });
+    this.scope.$watch("inputs.arrow.v0fps", function(){ me.scope.inputs.arrow.v0 = Math.round(me.scope.inputs.arrow.v0fps * 0.3048); me.calcTable(); });
     
     this.scope.clearLocalStorage = function() { me.clear(); };
     this.scope.saveSettings = function() { me.saveSettings(); };
@@ -760,7 +760,7 @@ Calculator.prototype.calcPolyfit = function()
     
     for(var j=0; j<this.scope.inputs.settings.length; j++)
     {
-        if(this.scope.inputs.settings[j].distance < 20)
+        if(this.scope.inputs.settings[j].distance < 22)
             continue;
             
         xMeters.push(this.scope.inputs.settings[j].distance);
@@ -776,7 +776,7 @@ Calculator.prototype.calcPolyfit = function()
 
 Calculator.prototype.evalPolyfit = function(xMeters)
 {
-    if(xMeters < 18 || !this.polynomial)
+    if(xMeters < 22 || !this.polynomial)
         return NaN;
     // var xMeters = model.distance;
     var r = this.polynomial[0][0] + this.polynomial[1][0] * xMeters + this.polynomial[2][0] * xMeters * xMeters;
@@ -797,12 +797,12 @@ Calculator.prototype.calcSlope = function()
         cd = Math.cos(40*d2r) * d; this.scope.model[i].down40 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
         cd = Math.cos(50*d2r) * d; this.scope.model[i].down50 = cd.toFixed(1); // CSPL.evalSpline(cd, xs, ys, ks).toFixed(2);
         
-        var time = d/this.scope.inputs.v0;
+        var time = d/this.scope.inputs.arrow.v0;
         var drop = 9.81/2.0*time*time*100;
         this.scope.model[i].time = time.toFixed(2);
         this.scope.model[i].drop = drop.toFixed(0); // excludes drag / air resistance
         
-        var t1 = (d-1)/this.scope.inputs.v0;
+        var t1 = (d-1)/this.scope.inputs.arrow.v0;
         var d1 = 9.81/2.0*t1*t1*100; // *100 cm
         this.scope.model[i].deltaScope = Math.round((drop-d1)/this.scope.model[i].delta1m);  // 1 REV on scope is x cm on target 
     }
@@ -982,7 +982,7 @@ Calculator.prototype.drawSvgShot = function(drawWhat)
         if(typeof(this.scope.inputs.maxDistance) == "number" && d > max)
             break;
             
-        var time = d/this.scope.inputs.v0;
+        var time = d/this.scope.inputs.arrow.v0;
         var drop = 9.81/2.0*time*time*10;
         var tuple = [d, drop];
         distDropGraph.push(tuple);
@@ -1089,11 +1089,11 @@ Calculator.prototype.advanceHighlightParcour = function() // store many parcours
       </tr>
       <tr>
         <th>V0 fps</th>
-        <td><input type="number" ng-model="inputs.v0fps"></td>
+        <td><input type="number" ng-model="inputs.arrow.v0fps"></td>
       </tr>
       <tr>
         <th>V0 m/s</th>
-        <td><input type="number" ng-model="inputs.v0"></td>
+        <td><input type="number" ng-model="inputs.arrow.v0"></td>
       </tr>
       <tr class="do-not-print">
         <th>Max Distance</th>
