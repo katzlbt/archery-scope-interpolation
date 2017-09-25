@@ -357,12 +357,10 @@ function Calculator($rootScope)
     this.scope.inputs = { 
         arrow:{ grains:400, name:"Arrow One", v0fps:245, v0:74 },
         settings:[], // [{ distance:, reading: }, ...]
-        v0fps:245,
-        v0:74,
         maxDistance:60
         };
     
-    this.scope.savedSettings = {};
+    this.scope.savedSettings = {};  // database { "settings-name": object, }
 
     var me = this;
     
@@ -380,15 +378,10 @@ function Calculator($rootScope)
     
     this.cubicSpline = null; // interpolator for 16+ meters
     this.cubicSplineBunnyshot = null; // interpolator for few meters
-    
-    this.scope.$watch("inputs.maxDistance", function(){ me.calcModel(); });
-    this.scope.$watch("model", function(){ me.calcTable(); }, true);
-    
+        
     this.load();
     this._calculateUris();
         
-    this.scope.$watch("inputs.arrow.v0fps", function(){ me.scope.inputs.arrow.v0 = Math.round(me.scope.inputs.arrow.v0fps * 0.3048); me.calcTable(); });
-    
     this.scope.clearLocalStorage = function() { me.clear(); };
     this.scope.saveSettings = function() { me.saveSettings(); };
     this.scope.loadSettings = function(x) { me.loadSettings(x); };
@@ -416,11 +409,30 @@ Calculator.prototype.startWatches = function()
 
     var me = this;
     
-    this.scope.$watch("inputs.arrow.name", function(){ me.scope.inputs.settingsName = me.scope.inputs.arrow.name + " " + (new Date()).toISOString().substring(2,10); });
+    this.scope.$watch("inputs.arrow.name", function(){
+        if(!me.scope.inputs.arrow)
+            me.scope.inputs["arrow"] = {};
+        if(!me.scope.inputs.arrow.name)
+            me.scope.inputs.arrow.name = "A1";
+            
+        me.scope.currentSettingsName = me.scope.inputs.arrow.name + " " + (new Date()).toISOString().substring(2,10); });
+        
+    this.scope.$watch("inputs.arrow.v0fps", function(){
+        if(!me.scope.inputs.arrow)
+            me.scope.inputs["arrow"] = {};
+        if(!me.scope.inputs.arrow.v0fps)
+            me.scope.inputs.arrow.v0fps = 265;
+            
+        me.scope.inputs.arrow.v0 = Math.round(me.scope.inputs.arrow.v0fps * 0.3048);
+        me.calcTable(); });
+        
+    this.scope.$watch("inputs.maxDistance", function(){ me.calcModel(); });
+
+    this.scope.$watch("model", function(){ me.calcTable(); }, true);
     
     this.scope.$watch("inputs", function(n,o){
         console.log("inputs changed!", o, n);
-        document.title = me.scope.inputs.settingsName; 
+        document.title = me.scope.currentSettingsName; 
         me.scope.inputsJSON = angular.toJson(me.scope.inputs);
         me.save(); }, true);
         
@@ -480,7 +492,7 @@ Calculator.prototype.updateUrlParameter = function(source) // renew the hashbang
 {
     this._calculateUris();
     
-    document.title = this.scope.inputs.settingsName; 
+    document.title = this.scope.currentSettingsName; 
     
     if(getParameterByName("data")) // strip the old get parameter
         window.history.replaceState(null, null, window.location.pathname);
@@ -511,6 +523,12 @@ Calculator.prototype.load = function()
         try
         {
             this.scope.inputs = angular.fromJson(inp);
+            
+            if(this.scope.inputs.v0) // versioning
+                this.scope.inputs.arrow.v0 = this.scope.inputs.v0;
+            if(this.scope.inputs.v0fps) // versioning
+                this.scope.inputs.arrow.v0fps = this.scope.inputs.v0fps;
+            
             this.scope.inputsJSON = inp;
             this.scope._dataParamHash = calculateIntegerHashFromString(inp); // json this.scope.inputsJSON 
         }
@@ -586,20 +604,24 @@ Calculator.prototype.clear = function()
 
 Calculator.prototype.saveSettings = function()
 {
-    if(!this.scope.inputs.settingsName) // undefined or empty
+    if(!this.scope.currentSettingsName) // undefined or empty
     {
         alert("Name of scope readings is empty! Cannot save.");
         return;
     }
     
-    this.scope.savedSettings[this.scope.inputs.settingsName] = this.scope.inputs.settings;
+    this.scope.savedSettings[this.scope.currentSettingsName] = this.scope.inputs.settings;
     this.save();
 };
 
 Calculator.prototype.loadSettings = function(name)
 {
-    this.scope.inputs.settings = this.scope.savedSettings[name];
-    this.scope.inputs.settingsName = name;
+    if(this.scope.savedSettings[name] instanceof Array) // old version does not store arrow in settings
+        this.scope.inputs.settings = this.scope.savedSettings[name];
+    else
+        this.scope.inputs = this.scope.savedSettings[name];
+    
+    this.scope.currentSettingsName = name; // me.scope.inputs.arrow.name+Date
     this.calcModel();
 };
 
@@ -915,7 +937,7 @@ Calculator.prototype.calcSvgModel = function(sight)
     group.rect(0.1, 20).move(minLine, 0);  // height 11mm
     group.rect(0.1, 20).move(maxLine, 0);
     
-    group.text(this.scope.inputs.settingsName).size(3).move(textOffsetX, textOffsetY);
+    group.text(this.scope.currentSettingsName).size(3).move(textOffsetX, textOffsetY);
     var px = this.getParallaxReadings(mind);
     if(px)
     {
@@ -1097,7 +1119,7 @@ Calculator.prototype.advanceHighlightParcour = function() // store many parcours
       </tr>
       <tr class="do-not-print">
         <th>Max Distance</th>
-        <td><input type="number" ng-model="inputs.maxDistance"></td>
+        <td><input type="number" ng-model="inputs.maxDistance" min="30" max="120"></td>
       </tr>
       <tr class="do-not-print">
         <th>Show drop</th>
@@ -1125,7 +1147,7 @@ Calculator.prototype.advanceHighlightParcour = function() // store many parcours
 
       <table id="table">
       <tr>
-        <th colspan=2><input type="text" ng-model="inputs.settingsName" style="width:112px"></th>
+        <th colspan=2><input type="text" ng-model="currentSettingsName" style="width:112px"></th>
         <th ng-show="showPolyfit">Fit</td>
         <th> m </th>
         <th> &delta;/m </th>
@@ -1161,7 +1183,7 @@ Calculator.prototype.advanceHighlightParcour = function() // store many parcours
       </tr>
       <tr class="tdcontrols do-not-print">
         <th>Bookmark</th>
-        <td colspan="99"><a href="index.html#!{{ inputsURI }}" target="_blank">{{ inputs.settingsName }}</a></td>
+        <td colspan="99"><a href="index.html#!{{ inputsURI }}" target="_blank">{{ currentSettingsName }}</a></td>
       </tr>
       <tr class="do-not-print">
         <td colspan="99" class="storage-warning">iOS and Android may discard this local data occasionally! Make a bookmark or a screenshot.</td>
