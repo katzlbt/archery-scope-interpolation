@@ -373,7 +373,6 @@ function Calculator($rootScope)
     //this.scope.$watch("inputs.arrow.weightAll", function(){ me.scope.inputs.arrow.grams = me.scope.inputs.arrow.weightAll/me.scope.inputs.arrow.count; });
     //this.scope.$watch("inputs.arrow.count", function(){ me.scope.inputs.arrow.grams = me.scope.inputs.arrow.weightAll/me.scope.inputs.arrow.count; });
     //this.scope.$watch("inputs.arrow.grams", function(){ me.scope.inputs.arrow.grains = me.scope.inputs.arrow.grams * 15.432358; });
-    this.scope.$watch("inputs.arrow.name", function(){ me.scope.inputs.settingsName = me.scope.inputs.arrow.name + " " + (new Date()).toISOString().substring(2,10); });
     
     this.maxTable = 90;
     
@@ -416,6 +415,8 @@ Calculator.prototype.startWatches = function()
     }
 
     var me = this;
+    
+    this.scope.$watch("inputs.arrow.name", function(){ me.scope.inputs.settingsName = me.scope.inputs.arrow.name + " " + (new Date()).toISOString().substring(2,10); });
     
     this.scope.$watch("inputs", function(n,o){
         console.log("inputs changed!", o, n);
