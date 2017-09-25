@@ -87,6 +87,9 @@ function getHashbangParameter(parameterName,defaultValue)
 
 function calculateIntegerHashFromString(s)
     {
+        if(!s)
+            return 0;
+            
         return s.split("").reduce(function(a,b){a=((a<<5)-a)+b.charCodeAt(0);return a&a},0);              
     }
         
@@ -804,46 +807,80 @@ Calculator.prototype.calcSlope = function()
     }
 };
 
-Calculator.prototype.calcSvgModel = function()
+Calculator.prototype.calcSvgModel = function(sight)
 {
     if(false == this.scope.showScaleAndSVG) // hidden
-        return;
+        return;        
         
+    if(sight)
+        this._calcSvgModelSigthType = sight;
+    
+    var mmPerRevolution = 0.99234;
+    var minLine = 6 * mmPerRevolution; // in mm for surelock
+    var maxLine = 88 * mmPerRevolution;
+    var textOffsetX = 55;
+    var textOffsetY = 0;
+    var textLinebreak = 4;
+    var angles = [10,15,20,25,30,40,50];
+    var anglesOffsets = {0:10, 10:8, 15:7, 20:6, 25:5, 30:4, 40:2, 50:0}; // 10-(m.angle)/5
+
+    switch(this._calcSvgModelSigthType)
+    {
+        case "shibuya":
+            mmPerRevolution = 1/24*25.4;
+            minLine = 0; // in mm
+            maxLine = 111.125; // 105.8333333333 at 10 111.125 = 10.5 * mmPerRevolution
+            textOffsetX = 1;
+            textOffsetY = 4.88;
+            textLinebreak = 5;
+            angles = [10,20,30,40];
+            anglesOffsets = {0:10, 10:8, 20:7, 30:6, 40:5};
+            break;
+    }
+    
+    if(!this.sightTextOffsetX)
+        this.sightTextOffsetX = textOffsetX; // init template
+    else
+        textOffsetX = this.sightTextOffsetX; // copy from template
+        
+    if(!this.sightTextOffsetY)
+        this.sightTextOffsetY = textOffsetY;
+    else
+        textOffsetY = this.sightTextOffsetY;
+    
     this.svgModel = [];
     
+    var me = this;
     var calcOneAngle = function(a, model)
     {
         var minReading = 999;
+        var minDistance = 999;
         for(var d=70; d>=10; d-=2) // parallax error prohibits plotting 5m values
         {
             var p = { distance:d , reading:0, angle:a };
             var realD = p.distance * Math.cos(a * d2r);
-            p.reading = this.evalSpline(realD);
+            p.reading = me.evalSpline(realD) * mmPerRevolution; // reading is actually mm from left side
             
             minReading = Math.min(minReading, p.reading);
+            minDistance = Math.min(minDistance, p.distance);
             //console.log(a, p.reading, minReading);
             if(p.reading <= minReading) // avoid plotting parallax area
                 model.push(p);
         }
         
-        return minReading;
+        return minDistance;
     };
     
     var d2r = Math.PI/180; // deg to rad
 
     // for every range and angle calc a data point
-    calcOneAngle(0, this.svgModel);
-    //calcOneAngle(0, this.svgModel);
-    calcOneAngle(10, this.svgModel);
-    calcOneAngle(15, this.svgModel);
-    calcOneAngle(20, this.svgModel);
-    calcOneAngle(25, this.svgModel);
-    calcOneAngle(30, this.svgModel);
-    calcOneAngle(40, this.svgModel);
-    calcOneAngle(50, this.svgModel);
+    var mind = calcOneAngle(0, this.svgModel);
+    
+    for(var i=0;i<angles.length;i++)
+        calcOneAngle(angles[i], this.svgModel);
     
     if(!this.svg)
-        this.svg = SVG('scale').attr({ width:"94mm", height:"20mm", preserveAspectRatio:"xMinYMin" }).viewbox(0,0,89,20)
+        this.svg = SVG('scale').attr({ width:"120mm", height:"20mm", preserveAspectRatio:"xMinYMin" }).viewbox(0,0,120,20)
     else
         this.svg.clear();
     
@@ -870,31 +907,32 @@ Calculator.prototype.calcSvgModel = function()
         else if(m.distance % 2 == 0)
             h=0.5;
     
-        group.rect(w, h).move(m.reading - w/2.0, y0 + 10-(m.angle)/5);        
+        group.rect(w, h).move(m.reading - w/2.0, y0 + anglesOffsets[m.angle]); console.log(10-(m.angle)/5)        
     }
-        
-    group.rect(0.1, 11).move(6, 0);
-    group.rect(0.1, 11).move(88, 0);
     
-    group.text(this.scope.inputs.settingsName).size(3).move(55, 0);
-    var px = this.getParallaxReadings();
+    // draw adjustment lines
+    group.rect(0.1, 20).move(minLine, 0);  // height 11mm
+    group.rect(0.1, 20).move(maxLine, 0);
+    
+    group.text(this.scope.inputs.settingsName).size(3).move(textOffsetX, textOffsetY);
+    var px = this.getParallaxReadings(mind);
     if(px)
     {
         var z1 = "", z2 = "", z3 = "";
         for(var i=0;i< px.length; i++)
         {
-            if(i<4)
+            if(i<textLinebreak)
                 z1 += px[i]+" ";
-            else if(i<7)
+            else if(i<textLinebreak*2)
                 z2 += px[i]+" ";
             else
                 z3 += px[i]+" ";
         }
         
-        var y = 3.2;
-        group.text(z1).size(2.5).move(55, y);
-        group.text(z2).size(2.5).move(58, y+2.6);
-        group.text(z3).size(2.5).move(61, y+2.6+2.6);
+        var y = textOffsetY + 3.2;
+        if(z1.length > 0) group.text(z1).size(2.5).move(textOffsetX, y);
+        if(z2.length > 0) group.text(z2).size(2.5).move(textOffsetX, y+2.6);
+        if(z3.length > 0) group.text(z3).size(2.5).move(textOffsetX, y+2.6+2.6);
     }
     
     var xml= document.getElementById('scale').innerHTML;
@@ -902,13 +940,13 @@ Calculator.prototype.calcSvgModel = function()
     //return this.svgModel;
 };
 
-Calculator.prototype.getParallaxReadings = function()
+Calculator.prototype.getParallaxReadings = function(minReading)
 {
     var ret = []; // must not be ""
     
     for(var i = 0; i < this.scope.model.length; i++)
     {
-        if(this.scope.model[i].distance > this.parallax) // normal
+        if(this.scope.model[i].distance > minReading) // normal
             continue;
             
         if(this.scope.model[i].reading > 0)
@@ -1247,13 +1285,25 @@ Calculator.prototype.advanceHighlightParcour = function() // store many parcours
             <button ng-click="calculator.drawSvgShot(1)">Draw Shot</button>
             X = Distance 0-70m Y = Arrow drop, Scope reading
         </center>
-        <h3>Sureloc Scale</h3>
-        <div id="scale" style="width:100mm; height:11mm; border:1px solid black;"></div>
+        <h3>Sight Scale</h3>
+        <h5>Shibuya Ultima CPX Scale</h5>
+        <p>The Shibuya sight shifts by 1/24' per revolution (1/24×25.4 mm) or 1/480' per click.
+        This makes the whole scale 0 ... 10.5 (105 rev) 111.125 mm long and the alignment lines are at readings 0 and 10.5</p>
+        <button ng-click="calculator.calcSvgModel('shibuya')">Draw Shibuya</button>
+
+        <h5>Surelock Challenger</h5>
+        <p>The Surelock sight has a scale from the reading 0.5 to 88 (measured 86.83 mm) which is 86.83/87.5 = 0.99234285714 mm/revolution.</p>
+        <button ng-click="calculator.calcSvgModel('sureloc')">Draw Sureloc</button>
+        <br/>
+        <br/>
+        <div id="scale" style="width:120mm; height:20mm; border:1px solid black; border-left:0px; border-right:0px;"></div>
         <pre id="svgxml"></pre>
-        <button ng-click="calculator.calcSvgModel()">Fine adjust svg SCALE for printing (0.8 ... 1.5)</button>
-        <input type="number" min="0.8" max="1.5" step="0.002" ng-model="inputs.svgScaleX" style="width:50px">
+        <button ng-click="calculator.calcSvgModel()">Redraw</button>        
         <button ng-click="calculator.saveSvg()">SAVE TO FILE</button>
         <br/>
+        Text offset X [mm]: <input type="number" min="0" max="100" step="1" ng-model="calculator.sightTextOffsetX" style="width:50px"> <br/>
+        Text offset Y [mm]: <input type="number" min="0" max="17" step="0.1" ng-model="calculator.sightTextOffsetY" style="width:50px"> <br/>
+        Fine adjust svg SCALE for printing (0.8 ... 1.5) <input type="number" min="0.8" max="1.5" step="0.002" ng-model="inputs.svgScaleX" style="width:50px">
         <pre>
             1. copy SVG into a file arrow.svg: <button ng-click="calculator.saveSvg()">SAVE TO FILE</button>
             2. open arrow.svg in Crome or Safari and print it.
