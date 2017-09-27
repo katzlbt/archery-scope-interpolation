@@ -1,5 +1,5 @@
 CACHE MANIFEST
-# V45 ... will be copied to cache.manifest by install.sh
+# V46 ... will be copied to cache.manifest by install.sh
 index.html
 svg.min.js
 FileSaver.min.js

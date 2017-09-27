@@ -347,7 +347,7 @@ LocalStorageManager.prototype._fromJSONcatch = function(jsonString, _default) //
         return _default;
     };
 
-function Calculator($rootScope)
+function Calculator($rootScope, $timeout)
 {
     this.scope = $rootScope;
     DEBUG_SCOPE = $rootScope;    
@@ -357,7 +357,8 @@ function Calculator($rootScope)
     this.scope.inputs = { 
         arrow:{ grains:400, name:"Arrow One", v0fps:245, v0:74 },
         settings:[], // [{ distance:, reading: }, ...]
-        maxDistance:60
+        maxDistance:60,
+        svgScaleX:1.0
         };
     
     this.scope.savedSettings = {};  // database { "settings-name": object, }
@@ -388,7 +389,6 @@ function Calculator($rootScope)
     this.scope.deleteSettings = function(x) { if(confirm('Delete?')) { me.deleteSettings(x); } };
         
     this.scope.showScaleAndSVG = false; // disables calcSvgModel()
-    this.scope.inputs.svgScaleX = 1.0;
     this.scope.$watch("inputs.svgScaleX", function(){ me.calcSvgModel(); });
         
     this.scope.calculator = this;
@@ -396,7 +396,7 @@ function Calculator($rootScope)
     var ls = localStorage.getItem('ARCHISCOPE_parcour_highlight');
     this.parcourHighlightRow = ls ? parseInt(ls) : 0;  // see also startWatches!
         
-    setTimeout(function(){ me.startWatches(); },1);    
+    $timeout(function(){ me.startWatches(); },1);    
 }
 
 Calculator.prototype.startWatches = function()
@@ -428,15 +428,18 @@ Calculator.prototype.startWatches = function()
         
     this.scope.$watch("inputs.maxDistance", function(){ me.calcModel(); });
 
-    this.scope.$watch("model", function(){ me.calcTable(); }, true);
+    this.scope.$watch("model", function(){ me.calcTable(); }, true);  // sets inputs.settings
     
     this.scope.$watch("inputs", function(n,o){
-        console.log("inputs changed!", o, n);
+        //console.log("inputs changed!", o, n);
         document.title = me.scope.currentSettingsName; 
         me.scope.inputsJSON = angular.toJson(me.scope.inputs);
         me.save(); }, true);
         
     this.scope.$watch("parcour", function(){ me.localStorageParcour.save(); me.updateUrlParameter("parcour"); }, true);
+    
+    me.calcModel();
+    me.calcTable();
 };
 
 Calculator.prototype.setExpandedModelDistance = function(d)
@@ -610,7 +613,7 @@ Calculator.prototype.saveSettings = function()
         return;
     }
     
-    this.scope.savedSettings[this.scope.currentSettingsName] = this.scope.inputs.settings;
+    this.scope.savedSettings[this.scope.currentSettingsName] = this.scope.inputs;
     this.save();
 };
 
@@ -635,6 +638,7 @@ Calculator.prototype.calcModel = function()  // create the distance model; does 
 {
     this.scope.model = [];
     
+    this.scope.inputs.maxDistance =  Math.max(30,this.scope.inputs.maxDistance);
     var max = this.scope.inputs.maxDistance;
     
     for(var j=0; j<this.scope.inputs.settings.length; j++) // do not discard user data
@@ -713,6 +717,7 @@ Calculator.prototype.calcTable = function() // copies distance/sight-reading to 
     if(settingsChanged || this.scope.inputs.settings.length != newSettings.length)
     {
         this.scope.inputs.settings = newSettings;
+        console.log("inputs.settings = newSettings");
     }
     
     if(n < 3)
