@@ -396,17 +396,21 @@ function Calculator($rootScope, $timeout)
     var ls = localStorage.getItem('ARCHISCOPE_parcour_highlight');
     this.parcourHighlightRow = ls ? parseInt(ls) : 0;  // see also startWatches!
         
-    $timeout(function(){ me.startWatches(); },1);    
+    $timeout(function(){ me.startWatches(); },1);
+    
+    $timeout(function(){ 
+        if(me.parcourHighlightRow > 0)
+        {
+            var element = document.getElementById("parcourTable")
+            var tdarray = element.getElementsByTagName("td");
+            var td = tdarray[me.parcourHighlightRow];
+            td.scrollIntoView(true);
+        }
+    },1000);    
 }
 
 Calculator.prototype.startWatches = function()
 {
-    if(this.parcourHighlightRow > 0)
-    {
-        var element = document.getElementById("parcourTable")
-        element.scrollIntoView(true);
-    }
-
     var me = this;
     
     this.scope.$watch("inputs.arrow.name", function(){
