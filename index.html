@@ -642,8 +642,7 @@ Calculator.prototype.calcModel = function()  // create the distance model; does 
 {
     this.scope.model = [];
     
-    this.scope.inputs.maxDistance =  Math.max(30,this.scope.inputs.maxDistance);
-    var max = this.scope.inputs.maxDistance;
+    var max = Math.min(Math.max(30,this.scope.inputs.maxDistance), 120);
     
     for(var j=0; j<this.scope.inputs.settings.length; j++) // do not discard user data
         if(this.scope.inputs.settings[j].distance > max)
@@ -1128,7 +1127,7 @@ Calculator.prototype.advanceHighlightParcour = function() // store many parcours
       </tr>
       <tr class="do-not-print">
         <th>Max Distance</th>
-        <td><input type="number" ng-model="inputs.maxDistance" min="30" max="120"></td>
+        <td><input type="number" ng-model="inputs.maxDistance" min="30" max="140"></td>
       </tr>
       <tr class="do-not-print">
         <th>Show drop</th>
