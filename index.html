@@ -261,7 +261,9 @@ LocalStorageManager.prototype._currentFromJSON = function(current) // save the c
     
 LocalStorageManager.prototype.currentToURIComponent = function() // save the current Item temporarily in LS
     {
-        return btoa ? encodeURIComponent(btoa(this._currentToJSON())) : "ERROR_btoa_not_supported";
+        var c = this._currentToJSON();
+        c = c.replace(/[^\x00-\xFF]/g, ""); // remove non ASCII components that cause exceptions in btoa
+        return btoa ? encodeURIComponent(btoa(c)) : "ERROR_btoa_not_supported";
     };
     
 LocalStorageManager.prototype.currentFromURIComponent = function(uric) // save the current Item temporarily in LS
