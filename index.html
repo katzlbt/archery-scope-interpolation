@@ -550,20 +550,22 @@ Calculator.prototype.load = function()
     if(isInWebAppiOS || isInWebAppChrome)
         return;
 
-    // not reachable in standalone web app
+    /* not reachable in standalone web app */
 
     var data = this.getUrlParameter();  // return json as string
-    if(data)  // we have the GET parameter ?data=
+    var saveAll = false;
+    if(data)  // we have the /sight/ parameter or ?data=
     {
         // avoid confirm on every opening of page, only if data= is new
         var hash = calculateIntegerHashFromString(data);
         if(hash != this.scope._dataParamHash)
         {
-            if(confirm("Replace saved data from URL?") === true)
+            if(confirm("Replace SCOPE data from URL?") === true)
             {
                 this.scope.inputs = angular.fromJson(data);
                 this.scope._dataParamHash = hash;
-                this.save();
+                // this.save(); // overwrites URL /parcour/!
+                saveAll = true;
             }
         }
     }
@@ -575,13 +577,16 @@ Calculator.prototype.load = function()
         var hashCurrent = calculateIntegerHashFromString(this.localStorageParcour.currentToURIComponent());
         if(hashURIC != hashCurrent)
         {
-            if(confirm("Replace parcour from URL?") === true)
+            if(confirm("Replace PARCOURS from URL?") === true)
             {
                 this.localStorageParcour.currentFromURIComponent(parcour);
-                this.localStorageParcour.save();
+                saveAll = true;
             }
         }    
     }
+    
+    if(saveAll)
+        this.save();
     
     // not reachable in standalone web app
 };
