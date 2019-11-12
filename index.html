@@ -547,10 +547,12 @@ Calculator.prototype.load = function()
         }        
     }
 
-    if(isInWebAppiOS || isInWebAppChrome)
+    if(inp && (isInWebAppiOS || isInWebAppChrome)) // restore from URL only if localStorage was wiped
         return;
 
-    /* not reachable in standalone web app */
+    /* not reachable in standalone web app if ARCHISCOPE_scopeinputs localStorage is set
+    Web apps always ask to restore from URL parameter each time they are started, otherwise.
+    */
 
     var data = this.getUrlParameter();  // return json as string
     var saveAll = false;
